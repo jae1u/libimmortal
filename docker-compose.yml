@@ -1,6 +1,9 @@
 services:
   libimmortal:
-    build: .
+    build:
+      context: .
+      args:
+        GAME_VER: "v1.0.1"
     image: libimmortal:1.0.1
     container_name: libimmortal_1.0.1
     environment:
@@ -11,6 +14,5 @@ services:
     ipc: host
     tty: true          # -t
     stdin_open: true   # -i
-    command: ["/usr/local/bin/start_xvfb.sh", "bash"]
     gpus: all
     # Add binded volumes as needed
