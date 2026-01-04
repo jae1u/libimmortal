@@ -27,17 +27,16 @@ pip install -e .
 5. Install pytorch that are compatible with you local gpu
 
 ### For Linux
-1. Build docker image
+1. Build and run docker container
 ```sh
-docker build -t libimmortal:1.0.1 .
+docker compose up -d --build
 ```
 
-2. create docker container
+2. Access docker container
 ```sh
-docker compose up -d
+docker compose exec libimmortal bash
 ```
 
-3. Access docker container
 ## Patch Note
 - v1.0  
 Known issue: Sprite rendering error while on animation playing  
