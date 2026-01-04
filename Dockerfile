@@ -30,20 +30,11 @@ RUN apt-get update && apt-get upgrade -y && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python 3.10.12
-ARG PY_VER=3.10.12
-RUN set -euo pipefail && \
-    cd /tmp && \
-    wget -q https://www.python.org/ftp/python/${PY_VER}/Python-${PY_VER}.tgz && \
-    tar -xf Python-${PY_VER}.tgz && cd Python-${PY_VER} && \
-    ./configure --prefix=/usr/local --enable-optimizations --with-lto && \
-    make -j"$(nproc)" && \
-    make altinstall && \
-    /usr/local/bin/python3.10 -m ensurepip --upgrade && \
-    /usr/local/bin/python3.10 -m pip install -U pip setuptools wheel && \
-    cd / && rm -rf /tmp/Python-${PY_VER} /tmp/Python-${PY_VER}.tgz
-
-RUN ln -sf /usr/local/bin/python3.10 /usr/local/bin/python3 && \
-    ln -sf /usr/local/bin/pip3.10    /usr/local/bin/pip3
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+WORKDIR /root
+RUN uv venv .venv --python 3.10.12
+ENV PATH="/root/.venv/bin:$PATH"
+ENV VIRTUAL_ENV="/root/.venv"
 
 RUN apt-get update --fix-missing
 RUN apt-get upgrade -y
@@ -54,11 +45,11 @@ RUN apt-get autoremove
 
 # Copy and install requirements.txt
 COPY requirements.txt /root/requirements.txt
-RUN pip3 install -r /root/requirements.txt
+RUN uv pip install -r /root/requirements.txt
 RUN rm /root/requirements.txt
 
 # Install Pytorch
-RUN pip3 install torch==2.1.1 torchvision==0.16.1 torchaudio==2.1.1 --index-url https://download.pytorch.org/whl/cu121
+RUN uv pip install torch==2.1.1 torchvision==0.16.1 torchaudio==2.1.1 --index-url https://download.pytorch.org/whl/cu121
 
 # Download linux game build
 RUN wget https://github.com/ist-tech-AI-games/immortal_suffering/releases/download/v1.0.1/immortal_suffering_linux_x86_64.zip
@@ -88,6 +79,6 @@ WORKDIR /root
 # Clone libimmortal repo
 COPY . /root/libimmortal
 WORKDIR /root/libimmortal
-RUN pip3 install -e .
+RUN uv pip install -e .
 
 WORKDIR /root
