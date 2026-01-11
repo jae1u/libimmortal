@@ -19,6 +19,11 @@ class GraphicObservationColorMap:
     GOAL = [2, 255, 0]              # Green
     KNIGHT_ATTACK = [128, 128, 204] # Light Blue
 """
+def fix_obs_structure(obs):
+        h, w = 90, 160
+        corrected_hwc = obs.reshape(h, w, 3)
+        corrected_chw = np.transpose(corrected_hwc, (2, 0, 1))
+        return corrected_chw
 
 class BasicObsBuilder:
     def __init__(self):
@@ -29,6 +34,7 @@ class BasicObsBuilder:
 
     def build(self, raw_obs):
         graphic_obs, vector_obs = parse_observation(raw_obs)
+        graphic_obs = fix_obs_structure(graphic_obs)
         id_map, onehot = colormap_to_ids_and_onehot(graphic_obs)
 
         # normalize
@@ -51,6 +57,7 @@ class ArrowObsBuilder:
 
     def build(self, raw_obs):
         graphic_obs, vector_obs = parse_observation(raw_obs)
+        graphic_obs = fix_obs_structure(graphic_obs)
         id_map, onehot = colormap_to_ids_and_onehot(graphic_obs)
 
         arrow_obs = np.zeros((self.MAX_ARROWS, 10), dtype=np.float32)
