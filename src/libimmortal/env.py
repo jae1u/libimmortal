@@ -105,7 +105,7 @@ class ImmortalSufferingEnv:
 
         grid_x, grid_y = get_grid_pos(player_x, player_y)
         player_distance = distance_grid[grid_y, grid_x]
-        reward = -player_distance
+        reward = -500 if player_distance == 0 else -player_distance
 
         # reward = -vector_obs[VectorObservationPlayerIndex.GOAL_PLAYER_DISTANCE]
         return reward
