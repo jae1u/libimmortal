@@ -136,6 +136,10 @@ __all__ = [
     "DEFAULT_ENCODER",
     "find_free_tcp_port",
     "find_n_free_tcp_ports",
+    "calculate_distance_map",
+    "get_grid_pos",
+    "parse_observation",
+    "fix_obs_structure",
 ]
 
 def fix_obs_structure(obs: np.ndarray) -> np.ndarray:
@@ -149,8 +153,8 @@ def calculate_distance_map(id_map: np.ndarray) -> np.ndarray:
     wall_id = DEFAULT_ENCODER.name2id["WALL"]
     goal_id = DEFAULT_ENCODER.name2id["GOAL"]
 
-    id_map[45:53, 114:130] = wall_id  # Induce double jump
-    id_map[75:83, 120:144] = wall_id  # Prevent stay at right bottom corner
+    id_map[45:53, 114:130] = wall_id 
+    id_map[75:83, 120:144] = wall_id  
 
     rows, cols = id_map.shape
     dist_map = np.full((rows, cols), -1, dtype=np.int32)
@@ -176,13 +180,19 @@ def calculate_distance_map(id_map: np.ndarray) -> np.ndarray:
 
     return dist_map
 
-
-data = np.loadtxt("log.txt", delimiter=",")
-slope_x, intercept_x = np.polyfit(data[:, 0], data[:, 2], 1)
-slope_y, intercept_y = np.polyfit(data[:, 1], data[:, 3], 1)
-
+_grid_pos_data = None
 
 def get_grid_pos(player_x, player_y):
+    global _grid_pos_data
+    
+    if _grid_pos_data is None:
+        log_path = "../../../log.txt"        
+        data = np.loadtxt(log_path, delimiter=",")
+        slope_x, intercept_x = np.polyfit(data[:, 0], data[:, 2], 1)
+        slope_y, intercept_y = np.polyfit(data[:, 1], data[:, 3], 1)
+        _grid_pos_data = (slope_x, intercept_x, slope_y, intercept_y)
+    
+    slope_x, intercept_x, slope_y, intercept_y = _grid_pos_data
     gx = int(slope_x * player_x + intercept_x)
     gy = int(slope_y * player_y + intercept_y)
     return gx, gy

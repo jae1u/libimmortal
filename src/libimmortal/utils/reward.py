@@ -1,59 +1,63 @@
-# apply new reward fn
 import numpy as np
+from libimmortal.utils import colormap_to_ids_and_onehot
+from libimmortal.utils.aux_func import calculate_distance_map, get_grid_pos
 
 
 class ImmortalRewardShaper:
-    def __init__(self, 
-                 goal_reward=10.0,
-                 distance_coef=0.5,
-                 kill_reward=0.5,
-                 time_penalty=0.001,
-                 death_penalty=5.0):
+    """
+    Reward shaper based on grid distance map from env.py
+    Uses BFS-based distance calculation to goal
+    """
+    def __init__(self, goal_reward=100.0):
         self.goal_reward = goal_reward
-        self.distance_coef = distance_coef
-        self.kill_reward = kill_reward
-        self.time_penalty = time_penalty
-        self.death_penalty = death_penalty
-        
-        self.prev_goal_distance = None
-        self.prev_enemy_count = None
+        self.distance_map = None
+        self.prev_grid_distance = None
     
-    def reset(self, vector_obs):
-        self.prev_goal_distance = float(vector_obs[11])
-        self.prev_enemy_count = self._count_enemies(vector_obs)
+    def reset(self, vector_obs, graphic_obs=None):
+        """Initialize distance map and previous distance"""
+        if graphic_obs is not None:
+            # Compute distance map using BFS
+            id_map, _ = colormap_to_ids_and_onehot(graphic_obs)
+            self.distance_map = calculate_distance_map(id_map)
+            
+            # Get player position and grid distance
+            player_x = vector_obs[0]  # PLAYER_POSITION_X
+            player_y = -vector_obs[1]  # PLAYER_POSITION_Y (negated)
+            grid_x, grid_y = get_grid_pos(player_x, player_y)
+            
+            # Bounds check
+            if 0 <= grid_y < self.distance_map.shape[0] and 0 <= grid_x < self.distance_map.shape[1]:
+                self.prev_grid_distance = float(self.distance_map[grid_y, grid_x])
+            else:
+                self.prev_grid_distance = None
+        else:
+            # graphic_obs가 없으면 distance map 사용하지 않음
+            self.distance_map = None
+            self.prev_grid_distance = None
     
-    def compute_reward(self, vector_obs, original_reward, done, truncated):
-        shaped_reward = 0.0
-        
+    def compute_reward(self, vector_obs, original_reward, done, truncated, graphic_obs=None):
+        # Goal reached
         if original_reward > 0:
             return self.goal_reward
         
-        current_distance = float(vector_obs[11])
-        if self.prev_goal_distance is not None:
-            distance_delta = self.prev_goal_distance - current_distance
-            shaped_reward += distance_delta * self.distance_coef
-        self.prev_goal_distance = current_distance
+        if self.distance_map is not None:
+            # Use grid-based distance (from graphic_obs)
+            player_x = vector_obs[0]
+            player_y = -vector_obs[1]
+            grid_x, grid_y = get_grid_pos(player_x, player_y)
+            
+            if not (0 <= grid_y < self.distance_map.shape[0] and 0 <= grid_x < self.distance_map.shape[1]):
+                return -500.0
+            
+            player_distance = float(self.distance_map[grid_y, grid_x])
+        else:
+            # Use vector_obs distance (when graphic_obs is not available)
+            player_distance = float(vector_obs[11])
         
-        current_enemy_count = self._count_enemies(vector_obs)
-        if self.prev_enemy_count is not None:
-            enemies_killed = self.prev_enemy_count - current_enemy_count
-            if enemies_killed > 0:
-                shaped_reward += enemies_killed * self.kill_reward
-        self.prev_enemy_count = current_enemy_count
+        if player_distance == 0:
+            reward = -500.0
+        else:
+            reward = -player_distance
         
-        shaped_reward -= self.time_penalty
-        
-        if done and not truncated and original_reward <= 0:
-            shaped_reward -= self.death_penalty
-        
-        return shaped_reward
-    
-    def _count_enemies(self, vector_obs):
-        count = 0
-        for i in range(10):
-            start_idx = 13 + i * 9
-            if start_idx + 7 < len(vector_obs):
-                enemy_health = vector_obs[start_idx + 7]
-                if enemy_health > 0:
-                    count += 1
-        return count
+        return reward
+
