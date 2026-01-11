@@ -41,25 +41,25 @@ class BasicObsBuilder:
         }
 
 class ArrowObsBuilder:
-    def __init__(self, history_len=2):
+    def __init__(self, history_len=2, MAX_ARROWS=3):
         self.observation_space = spaces.Dict({
-            "vector": spaces.Box(low=-np.inf, high=np.inf, shape=(146,), dtype=np.float32)
+            "vector": spaces.Box(low=-np.inf, high=np.inf, shape=(113+10*MAX_ARROWS,), dtype=np.float32)
         })
         self.history_len = history_len
         self.arrow_history = deque(maxlen=history_len)
+        self.MAX_ARROWS = MAX_ARROWS
 
     def build(self, raw_obs):
         graphic_obs, vector_obs = parse_observation(raw_obs)
         id_map, onehot = colormap_to_ids_and_onehot(graphic_obs)
 
-        MAX_ARROWS = 3
-        arrow_obs = np.zeros((MAX_ARROWS, 10), dtype=np.float32)
+        arrow_obs = np.zeros((self.MAX_ARROWS, 10), dtype=np.float32)
 
         arrows_y, arrows_x = np.where(id_map == 6)
         arrows = list(zip(arrows_x, arrows_y))
         self.arrow_history.append(arrows)
         for i, arrow in enumerate(arrows):
-            if i >= MAX_ARROWS:
+            if i >= self.MAX_ARROWS:
                 break
 
             if len(self.arrow_history) >= 2:
