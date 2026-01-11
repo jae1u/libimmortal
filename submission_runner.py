@@ -88,10 +88,6 @@ def main():
 
     MAX_STEPS = args.max_steps
     obs = env.reset()
-    graphic_obs, vector_obs = parse_observation(obs)
-    id_map, graphic_obs = colormap_to_ids_and_onehot(
-        graphic_obs
-    )  # one-hot encoded graphic observation
 
     ###################################
     """
@@ -110,10 +106,6 @@ def main():
         
         action = env.env.action_space.sample()  # REPLACE this with your AI agent's action
         obs, reward, done, info = env.step(action)
-        graphic_obs, vector_obs = parse_observation(obs)
-        id_map, graphic_obs = colormap_to_ids_and_onehot(
-            graphic_obs
-        )  # one-hot encoded graphic observation
 
     env.close()
 

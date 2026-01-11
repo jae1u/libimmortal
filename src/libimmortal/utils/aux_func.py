@@ -5,6 +5,7 @@ import numpy as np
 from .enums import GraphicObservationColorMap
 import socket
 from contextlib import closing
+from collections import deque
 
 
 @dataclass(frozen=True)
@@ -127,7 +128,7 @@ def parse_observation(
     else:
         raise ValueError("Invalid observation format")
 
-    return graphic_obs, vector_obs
+    return fix_obs_structure(graphic_obs), vector_obs
 
 __all__ = [
     "ColorMapEncoder",
@@ -136,3 +137,41 @@ __all__ = [
     "find_free_tcp_port",
     "find_n_free_tcp_ports",
 ]
+
+def fix_obs_structure(obs: np.ndarray) -> np.ndarray:
+    h, w = 90, 160
+    corrected_hwc = obs.reshape(h, w, 3)
+    corrected_hwc = np.transpose(corrected_hwc, (2, 0, 1))
+    return corrected_hwc
+
+
+def calculate_distance_map(id_map: np.ndarray) -> np.ndarray:
+    wall_id = DEFAULT_ENCODER.name2id['WALL']
+    goal_id = DEFAULT_ENCODER.name2id['GOAL']
+
+    id_map[45:53, 114:130] = wall_id  # Induce double jump
+    id_map[75:83, 120:144] = wall_id  # Prevent stay at right bottom corner
+
+    rows, cols = id_map.shape
+    dist_map = np.full((rows, cols), -1, dtype=np.int32)
+    queue = deque()
+    goal_coords = np.argwhere(id_map == goal_id)
+
+    for r, c in goal_coords:
+        dist_map[r, c] = 0
+        queue.append((r, c))
+
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    while queue:
+        curr_r, curr_c = queue.popleft()
+        current_dist = dist_map[curr_r, curr_c]
+
+        for dr, dc in directions:
+            next_r, next_c = curr_r + dr, curr_c + dc
+
+            if 0 <= next_r < rows and 0 <= next_c < cols:
+                if dist_map[next_r, next_c] == -1 and id_map[next_r, next_c] != wall_id:
+                    dist_map[next_r, next_c] = current_dist + 1
+                    queue.append((next_r, next_c))
+
+    return dist_map

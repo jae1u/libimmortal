@@ -9,6 +9,7 @@ from mlagents_envs.side_channel.environment_parameters_channel import (
 from mlagents_envs.envs.unity_gym_env import UnityToGymWrapper
 from libimmortal.utils import colormap_to_ids_and_onehot, parse_observation
 from .utils.enums import VectorObservationPlayerIndex
+from .utils.aux_func import calculate_distance_map
 
 
 class ImmortalSufferingEnv:
@@ -92,7 +93,18 @@ class ImmortalSufferingEnv:
         }
 
     def _get_reward(self, observation: np.ndarray) -> float:
-        vector_obs = observation["vector"]
+        graphic_obs, vector_obs = parse_observation(observation)
+        id_map, graphic_obs = colormap_to_ids_and_onehot(
+            graphic_obs
+        )  # one-hot encoded graphic observation
+
+        # Don't work yet
+        distance_grid = calculate_distance_map(id_map)
+        player_x = int(vector_obs[VectorObservationPlayerIndex.PLAYER_POSITION_X])
+        player_y = int(vector_obs[VectorObservationPlayerIndex.PLAYER_POSITION_Y])
+        distance_to_goal = distance_grid[player_y, player_x]
+        reward = 0.0 if distance_to_goal == -1 else -distance_to_goal
+        
         reward = -vector_obs[VectorObservationPlayerIndex.GOAL_PLAYER_DISTANCE]
         return reward
 
@@ -100,7 +112,10 @@ class ImmortalSufferingEnv:
         self, action: np.ndarray
     ) -> tuple[dict[str, np.ndarray], float, bool, dict]:
         observation, reward, done, info = self.env.step(action)
+
         observation = self._parse_observation(observation)
+        graphic_obs, vector_obs = parse_observation(observation)
+        # TODO: 경다인 (graphic_obs, vector_obs -> observation)
         reward = self._get_reward(observation)
 
         return observation, reward, done, info
