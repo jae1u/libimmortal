@@ -17,7 +17,7 @@ python -m libimmortal.samples.train_sb3 \
     --save_freq 100000 \
     --time_scale 1.0 \
     --seed 42 \
-    --obs_type basic \
+    --obs_type raw \
     --checkpoint_dir ./checkpoints \
     --tensorboard_log ./tensorboard_logs \
     --use_wandb \
