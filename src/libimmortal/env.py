@@ -8,6 +8,7 @@ from mlagents_envs.side_channel.environment_parameters_channel import (
 )
 from mlagents_envs.envs.unity_gym_env import UnityToGymWrapper
 from libimmortal.utils import colormap_to_ids_and_onehot, parse_observation
+from .utils.enums import VectorObservationPlayerIndex
 
 
 class ImmortalSufferingEnv:
@@ -90,11 +91,17 @@ class ImmortalSufferingEnv:
             "vector": observation[1],  # Vector observation
         }
 
+    def _get_reward(self, observation: np.ndarray) -> float:
+        vector_obs = observation["vector"]
+        reward = -vector_obs[VectorObservationPlayerIndex.GOAL_PLAYER_DISTANCE]
+        return reward
+
     def step(
         self, action: np.ndarray
     ) -> tuple[dict[str, np.ndarray], float, bool, dict]:
         observation, reward, done, info = self.env.step(action)
         observation = self._parse_observation(observation)
+        reward = self._get_reward(observation)
 
         return observation, reward, done, info
 
