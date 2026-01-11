@@ -146,8 +146,8 @@ def fix_obs_structure(obs: np.ndarray) -> np.ndarray:
 
 
 def calculate_distance_map(id_map: np.ndarray) -> np.ndarray:
-    wall_id = DEFAULT_ENCODER.name2id['WALL']
-    goal_id = DEFAULT_ENCODER.name2id['GOAL']
+    wall_id = DEFAULT_ENCODER.name2id["WALL"]
+    goal_id = DEFAULT_ENCODER.name2id["GOAL"]
 
     id_map[45:53, 114:130] = wall_id  # Induce double jump
     id_map[75:83, 120:144] = wall_id  # Prevent stay at right bottom corner
@@ -175,3 +175,14 @@ def calculate_distance_map(id_map: np.ndarray) -> np.ndarray:
                     queue.append((next_r, next_c))
 
     return dist_map
+
+
+data = np.loadtxt("log.txt", delimiter=",")
+slope_x, intercept_x = np.polyfit(data[:, 0], data[:, 2], 1)
+slope_y, intercept_y = np.polyfit(data[:, 1], data[:, 3], 1)
+
+
+def get_grid_pos(player_x, player_y):
+    gx = int(slope_x * player_x + intercept_x)
+    gy = int(slope_y * player_y + intercept_y)
+    return gx, gy

@@ -9,7 +9,7 @@ from mlagents_envs.side_channel.environment_parameters_channel import (
 from mlagents_envs.envs.unity_gym_env import UnityToGymWrapper
 from libimmortal.utils import colormap_to_ids_and_onehot, parse_observation
 from .utils.enums import VectorObservationPlayerIndex
-from .utils.aux_func import calculate_distance_map
+from .utils.aux_func import calculate_distance_map, get_grid_pos
 
 
 class ImmortalSufferingEnv:
@@ -98,14 +98,16 @@ class ImmortalSufferingEnv:
             graphic_obs
         )  # one-hot encoded graphic observation
 
-        # Don't work yet
         distance_grid = calculate_distance_map(id_map)
-        player_x = int(vector_obs[VectorObservationPlayerIndex.PLAYER_POSITION_X])
-        player_y = int(vector_obs[VectorObservationPlayerIndex.PLAYER_POSITION_Y])
-        distance_to_goal = distance_grid[player_y, player_x]
-        reward = 0.0 if distance_to_goal == -1 else -distance_to_goal
-        
-        reward = -vector_obs[VectorObservationPlayerIndex.GOAL_PLAYER_DISTANCE]
+
+        player_x = vector_obs[VectorObservationPlayerIndex.PLAYER_POSITION_X]
+        player_y = -vector_obs[VectorObservationPlayerIndex.PLAYER_POSITION_Y]
+
+        grid_x, grid_y = get_grid_pos(player_x, player_y)
+        player_distance = distance_grid[grid_y, grid_x]
+        reward = -player_distance
+
+        # reward = -vector_obs[VectorObservationPlayerIndex.GOAL_PLAYER_DISTANCE]
         return reward
 
     def step(
