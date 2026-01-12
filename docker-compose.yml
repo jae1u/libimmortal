@@ -1,3 +1,5 @@
+name: NAME
+
 services:
   libimmortal:
     build:
@@ -5,7 +7,7 @@ services:
       args:
         GAME_VER: "v1.0.1"
     image: libimmortal:1.0.1
-    container_name: libimmortal_1.0.1
+    container_name: libimmortal_1.0.1_NAME
     environment:
       - DISPLAY=:99
       # - XVFB_RES=1600x900x24     # 필요시 해상도 지정 (start_xvfb.sh에서 읽음)
@@ -15,4 +17,5 @@ services:
     tty: true          # -t
     stdin_open: true   # -i
     gpus: all
-    # Add binded volumes as needed
+    volumes:
+      - .:/root/libimmortal

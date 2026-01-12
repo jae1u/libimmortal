@@ -11,14 +11,14 @@ RUN sed -i 's|http://archive.ubuntu|http://mirror.kakao|g' /etc/apt/sources.list
     sed -i 's|http://security.ubuntu|http://mirror.kakao|g' /etc/apt/sources.list
 
 # Install basic packages and Xvfb
-RUN apt update && apt upgrade -y && \
-    apt install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
     build-essential make cmake clang gcc-10 g++-10 \
     wget curl ca-certificates git unzip zip \
     htop tmux vim nvtop \
     xvfb x11vnc fluxbox \
     mesa-utils libgl1-mesa-glx libglu1-mesa && \
-    apt clean && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 COPY docker/start_xvfb.sh /usr/local/bin/start_xvfb.sh
@@ -47,9 +47,9 @@ RUN wget -q ${GAME_URL} && \
     chmod -R 755 /root/immortal_suffering/immortal_suffering_linux_build.x86_64 && \
     rm immortal_suffering_linux_x86_64.zip
 
-# Clone libimmortal repo
-COPY . /root/libimmortal
-RUN uv pip install -e ./libimmortal
+# Install libimmortal in editable mode
+COPY pyproject.toml README.md src /root/libimmortal/
+RUN uv pip install -e ./libimmortal/
 
 ENTRYPOINT ["/usr/local/bin/start_xvfb.sh"]
 CMD ["bash"]
