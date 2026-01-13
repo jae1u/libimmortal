@@ -7,7 +7,7 @@ import torch
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
-from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
+from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback, BaseCallback
 from stable_baselines3.common.monitor import Monitor
 import wandb
 from wandb.integration.sb3 import WandbCallback
@@ -16,6 +16,32 @@ from libimmortal.env import ImmortalSufferingEnv
 from libimmortal.utils import find_free_tcp_port, find_n_free_tcp_ports
 from libimmortal.utils.reward import ImmortalRewardShaper
 from libimmortal.utils.obs_builder import BasicObsBuilder, ArrowObsBuilder
+
+
+class VecNormalizeCheckpointCallback(BaseCallback):
+    def __init__(self, save_freq, save_path, name_prefix="rl_model", verbose=0):
+        super().__init__(verbose)
+        self.save_freq = save_freq
+        self.save_path = Path(save_path)
+        self.name_prefix = name_prefix
+        self.save_path.mkdir(parents=True, exist_ok=True)
+    
+    def _on_step(self):
+        if self.n_calls % self.save_freq == 0:
+            # 모델 저장
+            model_path = self.save_path / f"{self.name_prefix}_{self.num_timesteps}_steps"
+            self.model.save(model_path)
+            if self.verbose > 0:
+                print(f"Saving model checkpoint to {model_path}")
+            
+            # VecNormalize stats 저장
+            if hasattr(self.training_env, 'save'):
+                stats_path = self.save_path / f"vec_normalize_{self.num_timesteps}_steps.pkl"
+                self.training_env.save(stats_path)
+                if self.verbose > 0:
+                    print(f"Saving VecNormalize stats to {stats_path}")
+        
+        return True
 
 
 class GymnasiumWrapper(gym.Env):
@@ -49,11 +75,8 @@ class GymnasiumWrapper(gym.Env):
         else:
             self.action_space = original_action_space
             self.is_multi_discrete = False
-        
-        # Observation space
-        # obs_builder에 따라 observation space 결정
+  
         if obs_builder is not None:
-            # obs_builder의 observation space 사용
             temp_obs = self.env.reset()
             built_obs = obs_builder.build(temp_obs)
             
@@ -96,7 +119,6 @@ class GymnasiumWrapper(gym.Env):
         self.min_distance_this_ep = float('inf')
     
     def _discrete_to_multi_discrete(self, action):
-        """Discrete action을 MultiDiscrete로 변환"""
         if not self.is_multi_discrete:
             return action
         multi_action = []
@@ -109,7 +131,6 @@ class GymnasiumWrapper(gym.Env):
         return np.array(multi_action, dtype=np.int32)
     
     def _count_enemies(self, vector_obs):
-        """Count alive enemies from vector observation"""
         count = 0
         for i in range(10):
             start_idx = 13 + i * 9
@@ -135,34 +156,35 @@ class GymnasiumWrapper(gym.Env):
     def reset(self, seed=None, options=None):
         if self.episode_step > 0:
             print(f"[EP] steps={self.episode_step} reward={self.episode_reward:.2f} "
-                  f"goal={self.goal_reached} kills={self.enemies_killed_this_ep} "
+                  f"goal={self.goal_reached} "
                   f"min_dist={self.min_distance_this_ep:.1f}")
         
         raw_obs = self.env.reset()
         
         if self.obs_builder:
             obs = self.obs_builder.build(raw_obs)
-            vector_obs = obs.get('vector', obs.get('image', np.zeros(103)))
-            graphic_obs = obs.get('image', None)
             
-            # obs_builder 사용 시 graphic_obs는 None (ArrowObsBuilder는 vector만 반환)
-            if vector_obs.shape[0] >= 103:
-                self.reward_shaper.reset(vector_obs[:103], graphic_obs)
-                self.prev_enemies = self._count_enemies(vector_obs[:103])
+            if isinstance(self.obs_builder, BasicObsBuilder):
+                # BasicObsBuilder
+                raw_graphic_obs, raw_vector_obs = self._parse_observation(raw_obs)
+                self.reward_shaper.reset(raw_vector_obs, raw_graphic_obs)
+                self.prev_enemies = self._count_enemies(raw_vector_obs)
             else:
-                self.reward_shaper.reset(vector_obs, graphic_obs)
-                self.prev_enemies = self._count_enemies(vector_obs)
+                # ArrowObsBuilder
+                _, raw_vector_obs = self._parse_observation(raw_obs)
+                self.reward_shaper.reset(raw_vector_obs, None)
+                self.prev_enemies = self._count_enemies(raw_vector_obs)
+            
+            vector_obs = obs.get('vector', obs.get('image', np.zeros(103)))
         else:
             graphic_obs, vector_obs = self._parse_observation(raw_obs)
             self.reward_shaper.reset(vector_obs, graphic_obs)
-            self.prev_enemies = self._count_enemies(vector_obs)
             obs = {'image': graphic_obs, 'vector': vector_obs}
         
         self.current_step = 0
         self.episode_step = 0
         self.episode_reward = 0
         self.goal_reached = False
-        self.enemies_killed_this_ep = 0
         self.min_distance_this_ep = float('inf')
         
         return obs, {}
@@ -176,22 +198,15 @@ class GymnasiumWrapper(gym.Env):
         
         if self.obs_builder:
             obs_dict = self.obs_builder.build(raw_obs)
-            
-            # vector 추출
-            if 'vector' in obs_dict:
-                vector_obs = obs_dict['vector']
-            elif 'image' in obs_dict:
-                vector_obs = np.zeros(103, dtype=np.float32)
+
+            if isinstance(self.obs_builder, BasicObsBuilder):
+                raw_graphic_obs, raw_vector_obs = self._parse_observation(raw_obs)
+                vector_for_reward = raw_vector_obs
+                graphic_obs = raw_graphic_obs
             else:
-                vector_obs = np.zeros(103, dtype=np.float32)
-            
-            # obs_builder 사용 시 graphic_obs는 None (ArrowObsBuilder는 vector만 반환)
-            graphic_obs = obs_dict.get('image', None)
-            
-            if vector_obs.shape[0] >= 103:
-                vector_for_reward = vector_obs[:103]
-            else:
-                vector_for_reward = vector_obs
+                _, raw_vector_obs = self._parse_observation(raw_obs)
+                vector_for_reward = raw_vector_obs
+                graphic_obs = None
         else:
             graphic_obs, vector_obs = self._parse_observation(raw_obs)
             vector_for_reward = vector_obs
@@ -203,13 +218,6 @@ class GymnasiumWrapper(gym.Env):
         if reward > 0:
             self.goal_reached = True
         
-        # Track enemy kills for logging (simplified without reward shaper dependency)
-        current_enemies = self._count_enemies(vector_for_reward)
-        if hasattr(self, 'prev_enemies'):
-            if self.prev_enemies > current_enemies:
-                self.enemies_killed_this_ep += (self.prev_enemies - current_enemies)
-        self.prev_enemies = current_enemies
-        
         truncated = self.current_step >= self.max_steps
         if truncated and not done:
             info['TimeLimit.truncated'] = True
@@ -218,7 +226,6 @@ class GymnasiumWrapper(gym.Env):
         self.episode_reward += shaped_reward
         
         info['goal_distance'] = current_distance
-        info['enemies_alive'] = current_enemies
         info['goal_reached'] = self.goal_reached
         
         return obs_dict, shaped_reward, done, truncated, info
@@ -258,13 +265,13 @@ def parse_args():
     parser.add_argument("--max_grad_norm", type=float, default=0.5)
     parser.add_argument("--checkpoint_dir", type=str, default="./checkpoints")
     parser.add_argument("--save_freq", type=int, default=10000)
-    parser.add_argument("--tensorboard_log", type=str, default="./tensorboard_logs")
     parser.add_argument("--policy", type=str, default="MultiInputPolicy", 
                        help="MultiInputPolicy for Dict observations")
     parser.add_argument("--use_wandb", action="store_true", help="Use WandB logging")
     parser.add_argument("--wandb_project", type=str, default="immortal-suffering-sb3")
     parser.add_argument("--wandb_run_name", type=str, default=None)
     parser.add_argument("--obs_type", type=str, default="basic", choices=["basic", "arrow", "raw"])
+    parser.add_argument("--resume_from", type=str, default=None, help="Path to checkpoint to resume from")
     
     return parser.parse_args()
 
@@ -289,18 +296,48 @@ def main():
     checkpoint_dir = Path(args.checkpoint_dir)
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     
-    # WandB 초기화
     if args.use_wandb:
-        run_name = args.wandb_run_name or f"ppo_{args.seed}_{args.learning_rate}"
-        wandb.init(
-            project=args.wandb_project,
-            name=run_name,
-            config=vars(args),
-            sync_tensorboard=True, 
-            monitor_gym=True,
-            save_code=True,
-        )
-        print(f"WandB 초기화. 프로젝트: {args.wandb_project}, Run: {run_name}")
+        run_name = args.wandb_run_name or f"ppo_{args.obs_type}_{args.seed}_{args.learning_rate}"
+        
+        # 체크포인트 재개 시 기존 run에 이어서 로깅
+        if args.resume_from and Path(args.resume_from).exists():
+            # run_id 파일이 있으면 같은 run 사용
+            run_id_file = Path(args.checkpoint_dir) / "wandb_run_id.txt"
+            if run_id_file.exists():
+                run_id = run_id_file.read_text().strip()
+                print(f"WandB run 재개: {run_id}")
+                wandb.init(
+                    project=args.wandb_project,
+                    name=run_name,
+                    id=run_id,
+                    resume="allow",
+                    config=vars(args),
+                    monitor_gym=True,
+                    save_code=True,
+                )
+            else:
+                # run_id 파일이 없으면 새로 생성
+                wandb.init(
+                    project=args.wandb_project,
+                    name=run_name,
+                    config=vars(args),
+                    monitor_gym=True,
+                    save_code=True,
+                )
+                run_id_file.write_text(wandb.run.id)
+        else:
+            wandb.init(
+                project=args.wandb_project,
+                name=run_name,
+                config=vars(args),
+                monitor_gym=True,
+                save_code=True,
+            )
+            run_id_file = Path(args.checkpoint_dir) / "wandb_run_id.txt"
+            run_id_file.parent.mkdir(parents=True, exist_ok=True)
+            run_id_file.write_text(wandb.run.id)
+        
+        print(f"WandB 프로젝트: {args.wandb_project}, Run: {run_name}")
         print(f"WandB URL: https://wandb.ai/{wandb.run.entity}/{wandb.run.project}/runs/{wandb.run.id}")
     
     # 병렬 
@@ -309,7 +346,7 @@ def main():
     
     env = SubprocVecEnv(env_fns)
     
-    # VecNormalize: observation과 reward 정규화
+    # VecNormalize. observation과 reward 정규화
     env = VecNormalize(
         env,
         training=True,
@@ -321,14 +358,13 @@ def main():
         epsilon=1e-8,
     )
     
-    print("VecNormalize 적용: obs/reward 정규화 활성화")
-    
     # Callbacks
     callbacks = [
-        CheckpointCallback(
+        VecNormalizeCheckpointCallback(
             save_freq=args.save_freq,
             save_path=str(checkpoint_dir),
-            name_prefix="ppo_immortal"
+            name_prefix="ppo_immortal",
+            verbose=1
         )
     ]
     
@@ -344,7 +380,7 @@ def main():
     print(f"\n[Training Config]")
     print(f"Envs: {args.n_envs} | Steps: {args.n_steps} | Batch: {args.batch_size} | Epochs: {args.n_epochs}")
     
-    # GPU 설정
+    # GPU 
     if torch.cuda.is_available():
         n_gpus = torch.cuda.device_count()
         device = 'cuda'
@@ -355,40 +391,62 @@ def main():
         device = 'cpu'
         print(f"Device: cpu | Total: {args.total_timesteps:,}")
     
-    model = PPO(
-        args.policy,
-        env,
-        learning_rate=args.learning_rate,
-        n_steps=args.n_steps,
-        batch_size=args.batch_size,
-        n_epochs=args.n_epochs,
-        gamma=args.gamma,
-        gae_lambda=args.gae_lambda,
-        clip_range=args.clip_range,
-        ent_coef=args.ent_coef,
-        vf_coef=args.vf_coef,
-        max_grad_norm=args.max_grad_norm,
-        tensorboard_log=args.tensorboard_log,
-        verbose=2,  
-        device=device
-    )
+    if args.resume_from and Path(args.resume_from).exists():
+        print(f"\nresume from: {args.resume_from}")
+        
+        # VecNormalize 통계 복원 
+        checkpoint_path = Path(args.resume_from)
+        if "steps" in checkpoint_path.stem:
+            timesteps_str = checkpoint_path.stem.split("_")[-2]
+            vec_normalize_path = checkpoint_path.parent / f"vec_normalize_{timesteps_str}_steps.pkl"
+            if vec_normalize_path.exists():
+                print(f"VecNormalize 통계 복원: {vec_normalize_path}")
+                env = VecNormalize.load(str(vec_normalize_path), env)
+            else:
+                print(f"VecNormalize 파일 없음, 기존 env 사용: {vec_normalize_path}")
+        
+        model = PPO.load(
+            args.resume_from,
+            env=env,
+            device=device,
+        )
+    else:
+        print(f"\n새로운 모델 생성")
+        model = PPO(
+            args.policy,
+            env,
+            learning_rate=args.learning_rate,
+            n_steps=args.n_steps,
+            batch_size=args.batch_size,
+            n_epochs=args.n_epochs,
+            gamma=args.gamma,
+            gae_lambda=args.gae_lambda,
+            clip_range=args.clip_range,
+            ent_coef=args.ent_coef,
+            vf_coef=args.vf_coef,
+            max_grad_norm=args.max_grad_norm,
+            verbose=2,  
+            device=device
+        )
     
     print(f"\nStarting training...")
-    print(f"Tensorboard: tensorboard --logdir {args.tensorboard_log}")
     print("="*60)
+    
+    # 체크포인트에서 재개 시 timesteps 이어서 진행
+    reset_timesteps = not (args.resume_from and Path(args.resume_from).exists())
     
     try:
         model.learn(
             total_timesteps=args.total_timesteps,
             callback=callbacks,
-            progress_bar=False  
+            progress_bar=False,
+            reset_num_timesteps=reset_timesteps  
         )
         
         final_path = checkpoint_dir / "ppo_immortal_final.zip"
         model.save(str(final_path))
         print(f"\nsave path: {final_path}")
-        
-        # VecNormalize 통계 저장
+ 
         vec_normalize_path = checkpoint_dir / "vec_normalize_final.pkl"
         env.save(str(vec_normalize_path))
         print(f"VecNormalize 통계 저장: {vec_normalize_path}")

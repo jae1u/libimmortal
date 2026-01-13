@@ -186,7 +186,12 @@ def get_grid_pos(player_x, player_y):
     global _grid_pos_data
     
     if _grid_pos_data is None:
-        log_path = "../../../log.txt"        
+        # 프로젝트 루트에서 log.txt 찾기
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.abspath(os.path.join(current_dir, "../../.."))
+        log_path = os.path.join(project_root, "log.txt")
+        
         data = np.loadtxt(log_path, delimiter=",")
         slope_x, intercept_x = np.polyfit(data[:, 0], data[:, 2], 1)
         slope_y, intercept_y = np.polyfit(data[:, 1], data[:, 3], 1)
