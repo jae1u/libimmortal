@@ -1,15 +1,8 @@
-echo "==================================="
-echo " Stable-Baselines3 PPO 학습 시작"
-echo "==================================="
-echo ""
+#!/bin/bash
 
-cd /root/libimmortal
-source venv/bin/activate
-
-# GPU 선택 (default: 0)
 GPU_ID=${1:-0}
 export CUDA_VISIBLE_DEVICES=$GPU_ID
-echo "Using GPU: $GPU_ID"
+echo "Using GPU ID: $GPU_ID"
 
 python -m libimmortal.utils.train_sb3 \
     --total_timesteps 10000000 \
@@ -26,12 +19,3 @@ python -m libimmortal.utils.train_sb3 \
     --use_wandb \
     --wandb_project "immortal-suffering-sb3" \
     --resume_from ./checkpoints/ppo_immortal_600000_steps.zip
-
-echo ""
-echo "==================================="
-echo " 학습 완료"
-echo "==================================="
-echo ""
-echo "체크포인트: ./checkpoints/"
-echo "최종 모델: ./checkpoints/ppo_immortal_final.zip"
-echo ""
