@@ -9,3 +9,5 @@ ray
 lz4
 mlagents==1.1.0
 mlagents-envs==1.1.0
+gymnasium
+stable_baselines3

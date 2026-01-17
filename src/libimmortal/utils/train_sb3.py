@@ -4,7 +4,7 @@ import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 import torch
-
+from typing import Optional
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 from stable_baselines3.common.callbacks import (
@@ -17,9 +17,9 @@ import wandb
 from wandb.integration.sb3 import WandbCallback
 
 from libimmortal.env import ImmortalSufferingEnv
-from libimmortal.utils import find_free_tcp_port, find_n_free_tcp_ports
+from libimmortal.utils import find_n_free_tcp_ports
 from libimmortal.utils.reward import ImmortalRewardShaper
-from libimmortal.utils.obs_builder import BasicObsBuilder, ArrowObsBuilder
+from libimmortal.utils.obs_builder import ObsBuilder, BasicObsBuilder, ArrowObsBuilder
 
 
 class VecNormalizeCheckpointCallback(BaseCallback):
@@ -275,7 +275,7 @@ def parse_args():
     parser.add_argument(
         "--game_path",
         type=str,
-        default="/root/immortal_suffering/immortal_suffering_linux_build.x86_64",
+        default="../immortal_suffering/immortal_suffering_linux_build.x86_64",
     )
     parser.add_argument("--port", type=int, default=None)
     parser.add_argument("--n_envs", type=int, default=4)
@@ -321,74 +321,68 @@ def parse_args():
     return parser.parse_args()
 
 
+def init_obs_builder(args: argparse.Namespace) -> Optional[ObsBuilder]:
+    match args.obs_type:
+        case "basic":
+            obs_builder = BasicObsBuilder()
+        case "arrow":
+            obs_builder = ArrowObsBuilder()
+        case _:
+            obs_builder = None
+    return obs_builder
+
+
+def init_ports(args: argparse.Namespace) -> list[int]:
+    if args.port is None:
+        ports = find_n_free_tcp_ports(args.n_envs)
+    else:
+        ports = [args.port + i for i in range(args.n_envs)]
+    return ports
+
+
+def init_checkpoint_dir(args: argparse.Namespace) -> Path:
+    checkpoint_dir = Path(args.checkpoint_dir)
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    return checkpoint_dir
+
+
+def wandb_init(args: argparse.Namespace, checkpoint_dir: Path):
+    if not args.use_wandb:
+        return
+    default_name = f"ppo_{args.obs_type}_{args.seed}_{args.learning_rate}"
+    run_name = args.wandb_run_name or default_name
+    run_id_file = checkpoint_dir / "wandb_run_id.txt"
+
+    run_id = None
+    resume_mode = None
+    if args.resume_from and Path(args.resume_from).exists() and run_id_file.exists():
+        run_id = run_id_file.read_text().strip()
+        resume_mode = "allow"
+
+    wandb.init(
+        project=args.wandb_project,
+        name=run_name,
+        id=run_id,
+        resume=resume_mode,
+        config=vars(args),
+        monitor_gym=True,
+        save_code=True,
+    )
+
+    if run_id is None:
+        run_id_file.write_text(wandb.run.id)
+
+    print(f"WandB Project: {args.wandb_project}, Run: {run_name}")
+    print(f"WandB URL: {wandb.run.get_url()}")
+
+
 def main():
     args = parse_args()
 
-    if args.obs_type == "basic":
-        obs_builder = BasicObsBuilder()
-    elif args.obs_type == "arrow":
-        obs_builder = ArrowObsBuilder()
-    else:
-        obs_builder = None
-
-    # 포트 자동 할당 (n_envs 개수만큼)
-    if args.port is None:
-        ports = find_n_free_tcp_ports(args.n_envs)
-        print(f"할당된 포트: {ports}")
-    else:
-        ports = [args.port + i for i in range(args.n_envs)]
-
-    checkpoint_dir = Path(args.checkpoint_dir)
-    checkpoint_dir.mkdir(parents=True, exist_ok=True)
-
-    if args.use_wandb:
-        run_name = (
-            args.wandb_run_name
-            or f"ppo_{args.obs_type}_{args.seed}_{args.learning_rate}"
-        )
-
-        # 체크포인트 재개 시 기존 run에 이어서 로깅
-        if args.resume_from and Path(args.resume_from).exists():
-            # run_id 파일이 있으면 같은 run 사용
-            run_id_file = Path(args.checkpoint_dir) / "wandb_run_id.txt"
-            if run_id_file.exists():
-                run_id = run_id_file.read_text().strip()
-                print(f"WandB run 재개: {run_id}")
-                wandb.init(
-                    project=args.wandb_project,
-                    name=run_name,
-                    id=run_id,
-                    resume="allow",
-                    config=vars(args),
-                    monitor_gym=True,
-                    save_code=True,
-                )
-            else:
-                # run_id 파일이 없으면 새로 생성
-                wandb.init(
-                    project=args.wandb_project,
-                    name=run_name,
-                    config=vars(args),
-                    monitor_gym=True,
-                    save_code=True,
-                )
-                run_id_file.write_text(wandb.run.id)
-        else:
-            wandb.init(
-                project=args.wandb_project,
-                name=run_name,
-                config=vars(args),
-                monitor_gym=True,
-                save_code=True,
-            )
-            run_id_file = Path(args.checkpoint_dir) / "wandb_run_id.txt"
-            run_id_file.parent.mkdir(parents=True, exist_ok=True)
-            run_id_file.write_text(wandb.run.id)
-
-        print(f"WandB 프로젝트: {args.wandb_project}, Run: {run_name}")
-        print(
-            f"WandB URL: https://wandb.ai/{wandb.run.entity}/{wandb.run.project}/runs/{wandb.run.id}"
-        )
+    obs_builder = init_obs_builder(args)
+    ports = init_ports(args)
+    checkpoint_dir = init_checkpoint_dir(args)
+    wandb_init(args, checkpoint_dir)
 
     # 병렬
     env_fns = [
