@@ -52,5 +52,6 @@ COPY pyproject.toml README.md /root/libimmortal/
 COPY src /root/libimmortal/src/
 RUN uv pip install -e ./libimmortal/
 
-ENTRYPOINT ["/usr/local/bin/start_xvfb.sh"]
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["bash"]
