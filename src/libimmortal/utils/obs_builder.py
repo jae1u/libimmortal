@@ -1,6 +1,7 @@
 import numpy as np
 from gym import spaces
 from collections import deque
+from abc import ABC, abstractmethod
 
 from libimmortal.utils.enums import *
 from libimmortal.utils import colormap_to_ids_and_onehot, parse_observation
@@ -28,8 +29,18 @@ def fix_obs_structure(obs):
     return corrected_chw
 
 
-class BasicObsBuilder:
+class ObsBuilder(ABC):
     def __init__(self):
+        self.observation_space = None
+
+    @abstractmethod
+    def build(self, raw_obs) -> dict:
+        pass
+
+
+class BasicObsBuilder(ObsBuilder):
+    def __init__(self):
+        super().__init__()
         self.observation_space = spaces.Dict(
             {
                 "image": spaces.Box(
@@ -53,8 +64,9 @@ class BasicObsBuilder:
         return {"image": onehot, "vector": vector_obs}  # Dict
 
 
-class ArrowObsBuilder:
+class ArrowObsBuilder(ObsBuilder):
     def __init__(self, history_len=2, MAX_ARROWS=3):
+        super().__init__()
         self.observation_space = spaces.Dict(
             {
                 "vector": spaces.Box(
