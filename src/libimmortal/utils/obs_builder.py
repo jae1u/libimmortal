@@ -30,8 +30,10 @@ def fix_obs_structure(obs):
 
 
 class ObsBuilder(ABC):
-    def __init__(self):
-        self.observation_space = None
+    @property
+    @abstractmethod
+    def observation_space(self) -> spaces.Space:
+        pass
 
     @abstractmethod
     def build(self, raw_obs) -> dict:
@@ -40,8 +42,7 @@ class ObsBuilder(ABC):
 
 class BasicObsBuilder(ObsBuilder):
     def __init__(self):
-        super().__init__()
-        self.observation_space = spaces.Dict(
+        self._observation_space = spaces.Dict(
             {
                 "image": spaces.Box(
                     low=0, high=255, shape=(11, 90, 160), dtype=np.float32
@@ -51,6 +52,10 @@ class BasicObsBuilder(ObsBuilder):
                 ),
             }
         )
+
+    @property
+    def observation_space(self) -> spaces.Space:
+        return self._observation_space
 
     def build(self, raw_obs):
         graphic_obs, vector_obs = parse_observation(raw_obs)
@@ -66,8 +71,7 @@ class BasicObsBuilder(ObsBuilder):
 
 class ArrowObsBuilder(ObsBuilder):
     def __init__(self, history_len=2, MAX_ARROWS=3):
-        super().__init__()
-        self.observation_space = spaces.Dict(
+        self._observation_space = spaces.Dict(
             {
                 "vector": spaces.Box(
                     low=-np.inf,
@@ -80,6 +84,10 @@ class ArrowObsBuilder(ObsBuilder):
         self.history_len = history_len
         self.arrow_history = deque(maxlen=history_len)
         self.MAX_ARROWS = MAX_ARROWS
+
+    @property
+    def observation_space(self) -> spaces.Space:
+        return self._observation_space
 
     def build(self, raw_obs):
         graphic_obs, vector_obs = parse_observation(raw_obs)
