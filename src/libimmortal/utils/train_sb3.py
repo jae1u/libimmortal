@@ -4,7 +4,7 @@ import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 import torch
-from typing import Optional
+from typing import Optional, Callable
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 from stable_baselines3.common.callbacks import (
@@ -258,8 +258,8 @@ class GymnasiumWrapper(gym.Env):
 
 def make_env(
     game_path, port, time_scale=2.0, seed=42, max_steps=2000, obs_builder=None
-):
-    def _init():
+) -> Callable[[], gym.Env]:
+    def _init() -> gym.Env:
         env = GymnasiumWrapper(
             game_path, port, time_scale, seed, max_steps, obs_builder
         )
@@ -269,7 +269,7 @@ def make_env(
     return _init
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="SB3 PPO 학습")
 
     parser.add_argument(
@@ -376,15 +376,9 @@ def wandb_init(args: argparse.Namespace, checkpoint_dir: Path):
     print(f"WandB URL: {wandb.run.get_url()}")
 
 
-def main():
-    args = parse_args()
-
-    obs_builder = init_obs_builder(args)
-    ports = init_ports(args)
-    checkpoint_dir = init_checkpoint_dir(args)
-    wandb_init(args, checkpoint_dir)
-
-    # 병렬
+def get_env_fns(
+    args: argparse.Namespace, ports: list[int], obs_builder: Optional[ObsBuilder]
+) -> list[Callable[[], gym.Env]]:
     env_fns = [
         make_env(
             args.game_path,
@@ -396,10 +390,38 @@ def main():
         )
         for i in range(args.n_envs)
     ]
+    return env_fns
 
-    env = SubprocVecEnv(env_fns)
 
-    # VecNormalize. observation과 reward 정규화
+def get_callbacks(args: argparse.Namespace, checkpoint_dir: Path) -> list[BaseCallback]:
+    callbacks: list[BaseCallback] = [
+        VecNormalizeCheckpointCallback(
+            save_freq=args.save_freq,
+            save_path=str(checkpoint_dir),
+            name_prefix="ppo_immortal",
+            verbose=1,
+        )
+    ]
+    if args.use_wandb:
+        callbacks.append(
+            WandbCallback(
+                model_save_freq=args.save_freq,
+                model_save_path=str(checkpoint_dir),
+                verbose=2,
+            )
+        )
+    return callbacks
+
+
+def main():
+    args = parse_args()
+
+    obs_builder = init_obs_builder(args)
+    ports = init_ports(args)
+    checkpoint_dir = init_checkpoint_dir(args)
+    wandb_init(args, checkpoint_dir)
+
+    env = SubprocVecEnv(get_env_fns(args, ports, obs_builder))
     env = VecNormalize(
         env,
         training=True,
@@ -411,56 +433,32 @@ def main():
         epsilon=1e-8,
     )
 
-    # Callbacks
-    callbacks = [
-        VecNormalizeCheckpointCallback(
-            save_freq=args.save_freq,
-            save_path=str(checkpoint_dir),
-            name_prefix="ppo_immortal",
-            verbose=1,
-        )
-    ]
-
-    if args.use_wandb:
-        callbacks.append(
-            WandbCallback(
-                model_save_freq=args.save_freq,
-                model_save_path=str(checkpoint_dir),
-                verbose=2,
-            )
-        )
+    callbacks = get_callbacks(args, checkpoint_dir)
 
     print(f"\n[Training Config]")
     print(
         f"Envs: {args.n_envs} | Steps: {args.n_steps} | Batch: {args.batch_size} | Epochs: {args.n_epochs}"
     )
 
-    # GPU
-    if torch.cuda.is_available():
-        n_gpus = torch.cuda.device_count()
-        device = "cuda"
-        print(f"Device: cuda | GPUs: {n_gpus} | Total: {args.total_timesteps:,}")
-        for i in range(n_gpus):
-            print(f"  GPU {i}: {torch.cuda.get_device_name(i)}")
-    else:
-        device = "cpu"
-        print(f"Device: cpu | Total: {args.total_timesteps:,}")
+    assert torch.cuda.is_available()
+    n_gpus = torch.cuda.device_count()
+    device = "cuda"
+    print(f"Device: cuda | GPUs: {n_gpus} | Total: {args.total_timesteps:,}")
+    for i in range(n_gpus):
+        print(f"  GPU {i}: {torch.cuda.get_device_name(i)}")
 
     if args.resume_from and Path(args.resume_from).exists():
-        print(f"\nresume from: {args.resume_from}")
+        print(f"resume from: {args.resume_from}")
 
-        # VecNormalize 통계 복원
         checkpoint_path = Path(args.resume_from)
         if "steps" in checkpoint_path.stem:
             timesteps_str = checkpoint_path.stem.split("_")[-2]
             vec_normalize_path = (
                 checkpoint_path.parent / f"vec_normalize_{timesteps_str}_steps.pkl"
             )
-            if vec_normalize_path.exists():
-                print(f"VecNormalize 통계 복원: {vec_normalize_path}")
-                env = VecNormalize.load(str(vec_normalize_path), env)
-            else:
-                print(f"VecNormalize 파일 없음, 기존 env 사용: {vec_normalize_path}")
+            assert vec_normalize_path.exists()
+            print(f"VecNormalize 통계 복원: {vec_normalize_path}")
+            env = VecNormalize.load(str(vec_normalize_path), env)
 
         model = PPO.load(
             args.resume_from,
@@ -468,7 +466,7 @@ def main():
             device=device,
         )
     else:
-        print(f"\n새로운 모델 생성")
+        print(f"새로운 모델 생성")
         model = PPO(
             args.policy,
             env,
@@ -486,7 +484,7 @@ def main():
             device=device,
         )
 
-    print(f"\nStarting training...")
+    print(f"Starting training...")
     print("=" * 60)
 
     # 체크포인트에서 재개 시 timesteps 이어서 진행
@@ -502,16 +500,14 @@ def main():
 
         final_path = checkpoint_dir / "ppo_immortal_final.zip"
         model.save(str(final_path))
-        print(f"\nsave path: {final_path}")
+        print(f"save path: {final_path}")
 
         vec_normalize_path = checkpoint_dir / "vec_normalize_final.pkl"
         env.save(str(vec_normalize_path))
         print(f"VecNormalize 통계 저장: {vec_normalize_path}")
-
     finally:
-        print("\nexit env...")
+        print("exit env...")
         env.close()
-
         if args.use_wandb:
             wandb.finish()
 
