@@ -48,7 +48,8 @@ RUN wget -q ${GAME_URL} && \
     rm immortal_suffering_linux_x86_64.zip
 
 # Install libimmortal in editable mode
-COPY pyproject.toml README.md src /root/libimmortal/
+COPY pyproject.toml README.md /root/libimmortal/
+COPY src /root/libimmortal/src/
 RUN uv pip install -e ./libimmortal/
 
 ENTRYPOINT ["/usr/local/bin/start_xvfb.sh"]

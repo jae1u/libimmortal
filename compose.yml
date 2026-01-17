@@ -1,13 +1,12 @@
-name: NAME
-
 services:
   libimmortal:
+    image: libimmortal_${COMPOSE_PROJECT_NAME}
+    container_name: libimmortal_${COMPOSE_PROJECT_NAME}
     build:
       context: .
       args:
         GAME_VER: "v1.0.1"
-    image: libimmortal_NAME:1.0.1
-    container_name: libimmortal_NAME
+    environment:
       - DISPLAY=:99
       # - XVFB_RES=1600x900x24     # 필요시 해상도 지정 (start_xvfb.sh에서 읽음)
       # - VNC_PORT=5900            # VNC 쓰면 포트 지정
