@@ -8,9 +8,11 @@ class ActionIndex:
     ATTACK_DOWN = 6
     ATTACK_RIGHT = 7
 
+
 class ObservationIndex:
     GRAPHIC = 0
     VECTOR = 1
+
 
 class VectorObservationPlayerIndex:
     PLAYER_POSITION_X = 0
@@ -27,6 +29,7 @@ class VectorObservationPlayerIndex:
     GOAL_PLAYER_DISTANCE = 11
     TIME_ELAPSED = 12
 
+
 class VectorObservationEnemyIndex:
     ENEMY_TYPE_SKELETON = 0
     ENEMY_TYPE_BOMBKID = 1
@@ -38,19 +41,21 @@ class VectorObservationEnemyIndex:
     ENEMY_HEALTH = 7
     ENEMY_STATE = 8
 
+
 class GraphicObservationColorMap:
     # Re-mapped using nearest RGB values observed in graphic_obs.txt (one frame)
-    BLANK = [8, 19, 49]             # was [0, 0, 0]
-    WALL = [0, 0, 255]              # unchanged
-    PLATFORM = [42, 15, 0]          # was [113, 69, 1]
-    TURRET = [115, 0, 255]          # was [179, 0, 255]
-    BOMBKID = [255, 0, 0]           # was [255, 2, 0]
-    SKELETON = [255, 255, 255]      # unchanged
-    ARROW = [208, 210, 215]         # was [255, 255, 0]
-    EXPLOSION = [186, 5, 14]        # was [255, 127, 0]
-    KNIGHT = [0, 255, 164]          # was [4, 255, 210]
-    GOAL = [0, 255, 0]              # unchanged
-    KNIGHT_ATTACK = [55, 55, 154]   # was [128, 128, 204]
+    BLANK = [8, 19, 49]  # was [0, 0, 0]
+    WALL = [0, 0, 255]  # unchanged
+    PLATFORM = [42, 15, 0]  # was [113, 69, 1]
+    TURRET = [115, 0, 255]  # was [179, 0, 255]
+    BOMBKID = [255, 0, 0]  # was [255, 2, 0]
+    SKELETON = [255, 255, 255]  # unchanged
+    ARROW = [208, 210, 215]  # was [255, 255, 0]
+    EXPLOSION = [186, 5, 14]  # was [255, 127, 0]
+    KNIGHT = [0, 255, 164]  # was [4, 255, 210]
+    GOAL = [0, 255, 0]  # unchanged
+    KNIGHT_ATTACK = [55, 55, 154]  # was [128, 128, 204]
+
 
 # class GraphicObservationColorMap:
 #     BLANK = [0, 0, 0]               # Black

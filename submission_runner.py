@@ -11,7 +11,6 @@ from libimmortal.env import ImmortalSufferingEnv
 from libimmortal.utils import colormap_to_ids_and_onehot, parse_observation
 
 
-
 def main():
     import tqdm
     import argparse
@@ -66,14 +65,13 @@ def main():
         default=18000,  # !NOTE: This will be set as 18000 (5 minutes in real-time) in assessment
         help="Number of steps to run the environment",
     )
-    
+
     ###################################
     """
     You can add more arguments here for your AI agent if needed.
     """
     ###################################
-    
-    
+
     args = parser.parse_args()
 
     env = ImmortalSufferingEnv(
@@ -96,15 +94,17 @@ def main():
     ###################################
 
     for _ in tqdm.tqdm(range(MAX_STEPS), desc="Stepping through environment"):
-        
+
         ###################################
         """
         Do whatever you want with the observation here and get action from your AI agent.
         Replace the random action below with your agent's action.
         """
         ###################################
-        
-        action = env.env.action_space.sample()  # REPLACE this with your AI agent's action
+
+        action = (
+            env.env.action_space.sample()
+        )  # REPLACE this with your AI agent's action
         obs, reward, done, info = env.step(action)
 
     env.close()
@@ -112,4 +112,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

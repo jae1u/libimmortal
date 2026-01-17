@@ -130,6 +130,7 @@ def parse_observation(
 
     return fix_obs_structure(graphic_obs), vector_obs
 
+
 __all__ = [
     "ColorMapEncoder",
     "colormap_to_ids_and_onehot",
@@ -142,6 +143,7 @@ __all__ = [
     "fix_obs_structure",
 ]
 
+
 def fix_obs_structure(obs: np.ndarray) -> np.ndarray:
     h, w = 90, 160
     corrected_hwc = obs.reshape(h, w, 3)
@@ -153,8 +155,8 @@ def calculate_distance_map(id_map: np.ndarray) -> np.ndarray:
     wall_id = DEFAULT_ENCODER.name2id["WALL"]
     goal_id = DEFAULT_ENCODER.name2id["GOAL"]
 
-    id_map[45:53, 114:130] = wall_id 
-    id_map[75:83, 120:144] = wall_id  
+    id_map[45:53, 114:130] = wall_id
+    id_map[75:83, 120:144] = wall_id
 
     rows, cols = id_map.shape
     dist_map = np.full((rows, cols), -1, dtype=np.int32)
@@ -180,23 +182,26 @@ def calculate_distance_map(id_map: np.ndarray) -> np.ndarray:
 
     return dist_map
 
+
 _grid_pos_data = None
+
 
 def get_grid_pos(player_x, player_y):
     global _grid_pos_data
-    
+
     if _grid_pos_data is None:
         # 프로젝트 루트에서 log.txt 찾기
         import os
+
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.abspath(os.path.join(current_dir, "../../.."))
         log_path = os.path.join(project_root, "log.txt")
-        
+
         data = np.loadtxt(log_path, delimiter=",")
         slope_x, intercept_x = np.polyfit(data[:, 0], data[:, 2], 1)
         slope_y, intercept_y = np.polyfit(data[:, 1], data[:, 3], 1)
         _grid_pos_data = (slope_x, intercept_x, slope_y, intercept_y)
-    
+
     slope_x, intercept_x, slope_y, intercept_y = _grid_pos_data
     gx = int(slope_x * player_x + intercept_x)
     gy = int(slope_y * player_y + intercept_y)
