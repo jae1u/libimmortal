@@ -5,7 +5,7 @@ from gymnasium import spaces
 from libimmortal.utils import colormap_to_ids_and_onehot
 
 
-class BasicObsWrapper(gym.ObservationWrapper):
+class DefaultObsWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
         self.observation_space = spaces.Dict(
@@ -41,7 +41,29 @@ class BasicObsWrapper(gym.ObservationWrapper):
         }
 
 
-class ArrowObsWrapper(BasicObsWrapper):
+class BasicObsWrapper(DefaultObsWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self.observation_space = spaces.Dict(
+            {
+                "image": spaces.Box(
+                    low=0, high=1, shape=(11, 90, 160), dtype=np.float32
+                ),
+                "vector": spaces.Box(
+                    low=-np.inf, high=np.inf, shape=(103,), dtype=np.float32
+                ),
+            }
+        )
+
+    def observation(self, observation: list[np.ndarray]):
+        obs_dict = super().observation(observation)
+        return {
+            "image": obs_dict["image"],
+            "vector": obs_dict["vector"],
+        }
+
+
+class ArrowObsWrapper(DefaultObsWrapper):
     def __init__(self, env: gym.Env, history_len: int = 2, max_arrows: int = 3):
         super().__init__(env)
         self.history_len = history_len
