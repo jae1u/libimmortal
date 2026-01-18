@@ -1,25 +1,20 @@
 import argparse
 from pathlib import Path
 import gymnasium as gym
-from gymnasium import spaces
-import numpy as np
 import torch
-from typing import Optional, Callable
+from typing import Callable
 from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
 from stable_baselines3.common.callbacks import (
-    CheckpointCallback,
-    EvalCallback,
     BaseCallback,
 )
 from stable_baselines3.common.monitor import Monitor
 import wandb
 from wandb.integration.sb3 import WandbCallback
 
-from libimmortal.env import ImmortalSufferingEnv
+from libimmortal.immortal_gym_env import ImmortalGymEnv
+from libimmortal.utils.obs_builder import BasicObsWrapper, ArrowObsWrapper
 from libimmortal.utils import find_n_free_tcp_ports
-from libimmortal.utils.reward import ImmortalRewardShaper
-from libimmortal.utils.obs_builder import ObsBuilder, BasicObsBuilder, ArrowObsBuilder
 
 
 class VecNormalizeCheckpointCallback(BaseCallback):
@@ -52,217 +47,16 @@ class VecNormalizeCheckpointCallback(BaseCallback):
         return True
 
 
-class GymnasiumWrapper(gym.Env):
-    def __init__(
-        self, game_path, port, time_scale=2.0, seed=42, max_steps=2000, obs_builder=None
-    ):
-        super().__init__()
-
-        self.env = ImmortalSufferingEnv(
-            game_path=game_path,
-            port=port,
-            time_scale=time_scale,
-            seed=seed,
-            width=720,
-            height=480,
-            verbose=False,
-        )
-
-        self.max_steps = max_steps
-        self.current_step = 0
-        self.obs_builder = obs_builder
-
-        # MLAgents는 MultiDiscrete([2 2 2 2 2 2 2 2])를 사용
-        # 각 액션이 0 또는 1
-        # 이를 하나의 Discrete space로 변환: 2^8 = 256 가지
-        original_action_space = self.env.env.action_space
-
-        if hasattr(original_action_space, "nvec"):
-            self.action_dims = original_action_space.nvec
-            self.n_actions = int(np.prod(self.action_dims))
-            self.action_space = spaces.Discrete(self.n_actions)
-            self.is_multi_discrete = True
-        else:
-            self.action_space = original_action_space
-            self.is_multi_discrete = False
-
-        if obs_builder is not None:
-            temp_obs = self.env.reset()
-            built_obs = obs_builder.build(temp_obs)
-
-            if isinstance(built_obs, dict):
-                obs_spaces = {}
-                for key, value in built_obs.items():
-                    if key == "image":
-                        obs_spaces[key] = spaces.Box(
-                            low=0, high=255, shape=value.shape, dtype=value.dtype
-                        )
-                    elif key == "vector":
-                        obs_spaces[key] = spaces.Box(
-                            low=-np.inf,
-                            high=np.inf,
-                            shape=value.shape,
-                            dtype=value.dtype,
-                        )
-                self.observation_space = spaces.Dict(obs_spaces)
-            else:
-                # vector only
-                self.observation_space = spaces.Box(
-                    low=-np.inf,
-                    high=np.inf,
-                    shape=built_obs.shape,
-                    dtype=built_obs.dtype,
-                )
-        else:
-            # raw mode: graphic + vector
-            self.observation_space = spaces.Dict(
-                {
-                    "image": spaces.Box(
-                        low=0, high=255, shape=(3, 90, 160), dtype=np.uint8
-                    ),
-                    "vector": spaces.Box(
-                        low=-np.inf, high=np.inf, shape=(103,), dtype=np.float32
-                    ),
-                }
-            )
-
-        self.reward_shaper = ImmortalRewardShaper()
-
-        self.episode_step = 0
-        self.episode_reward = 0
-        self.goal_reached = False
-        self.enemies_killed_this_ep = 0
-        self.min_distance_this_ep = float("inf")
-
-    def _discrete_to_multi_discrete(self, action):
-        if not self.is_multi_discrete:
-            return action
-        multi_action = []
-        remaining = int(action)
-        for dim in reversed(self.action_dims):
-            multi_action.append(remaining % dim)
-            remaining //= dim
-        multi_action.reverse()
-
-        return np.array(multi_action, dtype=np.int32)
-
-    def _count_enemies(self, vector_obs):
-        count = 0
-        for i in range(10):
-            start_idx = 13 + i * 9
-            if start_idx + 7 < len(vector_obs):
-                enemy_health = vector_obs[start_idx + 7]
-                if enemy_health > 0:
-                    count += 1
-        return count
-
-    def _parse_observation(self, obs):
-        if isinstance(obs, dict):
-            if "image" in obs:
-                return obs["image"], obs.get("vector", np.zeros(103))
-            elif "graphic" in obs:
-                return obs["graphic"], obs.get("vector", np.zeros(103))
-            else:
-                return obs.get("vector", np.zeros(103)), obs.get(
-                    "vector", np.zeros(103)
-                )
-        elif isinstance(obs, tuple) and len(obs) == 2:
-            return obs
-        else:
-            return obs[0], obs[1]
-
-    def reset(self, seed=None, options=None):
-        if self.episode_step > 0:
-            print(
-                f"[EP] steps={self.episode_step} reward={self.episode_reward:.2f} "
-                f"goal={self.goal_reached} "
-                f"min_dist={self.min_distance_this_ep:.1f}"
-            )
-
-        raw_obs = self.env.reset()
-
-        if self.obs_builder:
-            obs = self.obs_builder.build(raw_obs)
-
-            if isinstance(self.obs_builder, BasicObsBuilder):
-                # BasicObsBuilder
-                raw_graphic_obs, raw_vector_obs = self._parse_observation(raw_obs)
-                self.reward_shaper.reset(raw_vector_obs, raw_graphic_obs)
-                self.prev_enemies = self._count_enemies(raw_vector_obs)
-            else:
-                # ArrowObsBuilder
-                _, raw_vector_obs = self._parse_observation(raw_obs)
-                self.reward_shaper.reset(raw_vector_obs, None)
-                self.prev_enemies = self._count_enemies(raw_vector_obs)
-
-            vector_obs = obs.get("vector", obs.get("image", np.zeros(103)))
-        else:
-            graphic_obs, vector_obs = self._parse_observation(raw_obs)
-            self.reward_shaper.reset(vector_obs, graphic_obs)
-            obs = {"image": graphic_obs, "vector": vector_obs}
-
-        self.current_step = 0
-        self.episode_step = 0
-        self.episode_reward = 0
-        self.goal_reached = False
-        self.min_distance_this_ep = float("inf")
-
-        return obs, {}
-
-    def step(self, action):
-        multi_action = self._discrete_to_multi_discrete(action)
-        raw_obs, reward, done, info = self.env.step(multi_action)
-
-        self.current_step += 1
-        self.episode_step += 1
-
-        if self.obs_builder:
-            obs_dict = self.obs_builder.build(raw_obs)
-
-            if isinstance(self.obs_builder, BasicObsBuilder):
-                raw_graphic_obs, raw_vector_obs = self._parse_observation(raw_obs)
-                vector_for_reward = raw_vector_obs
-                graphic_obs = raw_graphic_obs
-            else:
-                _, raw_vector_obs = self._parse_observation(raw_obs)
-                vector_for_reward = raw_vector_obs
-                graphic_obs = None
-        else:
-            graphic_obs, vector_obs = self._parse_observation(raw_obs)
-            vector_for_reward = vector_obs
-            obs_dict = {"image": graphic_obs, "vector": vector_obs}
-
-        current_distance = float(vector_for_reward[11])
-        self.min_distance_this_ep = min(self.min_distance_this_ep, current_distance)
-
-        if reward > 0:
-            self.goal_reached = True
-
-        truncated = self.current_step >= self.max_steps
-        if truncated and not done:
-            info["TimeLimit.truncated"] = True
-
-        shaped_reward = self.reward_shaper.compute_reward(
-            vector_for_reward, reward, done, truncated, graphic_obs
-        )
-        self.episode_reward += shaped_reward
-
-        info["goal_distance"] = current_distance
-        info["goal_reached"] = self.goal_reached
-
-        return obs_dict, shaped_reward, done, truncated, info
-
-    def close(self):
-        self.env.close()
-
-
 def make_env(
-    game_path, port, time_scale=2.0, seed=42, max_steps=2000, obs_builder=None
+    game_path,
+    port,
+    time_scale=2.0,
+    seed=42,
+    max_steps=2000,
+    obs_wrapper: type[gym.ObservationWrapper] = BasicObsWrapper,
 ) -> Callable[[], gym.Env]:
     def _init() -> gym.Env:
-        env = GymnasiumWrapper(
-            game_path, port, time_scale, seed, max_steps, obs_builder
-        )
+        env = ImmortalGymEnv(game_path, port, time_scale, seed, max_steps, obs_wrapper)
         env = Monitor(env)
         return env
 
@@ -309,7 +103,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--wandb_project", type=str, default="immortal-suffering-sb3")
     parser.add_argument("--wandb_run_name", type=str, default=None)
     parser.add_argument(
-        "--obs_type", type=str, default="basic", choices=["basic", "arrow", "raw"]
+        "--obs_type", type=str, default="basic", choices=["basic", "arrow"]
     )
     parser.add_argument(
         "--resume_from",
@@ -321,15 +115,15 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def init_obs_builder(args: argparse.Namespace) -> Optional[ObsBuilder]:
+def init_obs_wrapper(args: argparse.Namespace) -> type[BasicObsWrapper]:
     match args.obs_type:
         case "basic":
-            obs_builder = BasicObsBuilder()
+            obs_wrapper = BasicObsWrapper
         case "arrow":
-            obs_builder = ArrowObsBuilder()
+            obs_wrapper = ArrowObsWrapper
         case _:
-            obs_builder = None
-    return obs_builder
+            obs_wrapper = BasicObsWrapper
+    return obs_wrapper
 
 
 def init_ports(args: argparse.Namespace) -> list[int]:
@@ -377,7 +171,7 @@ def wandb_init(args: argparse.Namespace, checkpoint_dir: Path):
 
 
 def get_env_fns(
-    args: argparse.Namespace, ports: list[int], obs_builder: Optional[ObsBuilder]
+    args: argparse.Namespace, ports: list[int], obs_wrapper: type[BasicObsWrapper]
 ) -> list[Callable[[], gym.Env]]:
     env_fns = [
         make_env(
@@ -386,7 +180,7 @@ def get_env_fns(
             args.time_scale,
             args.seed + i,
             args.max_steps,
-            obs_builder,
+            obs_wrapper,
         )
         for i in range(args.n_envs)
     ]
@@ -416,12 +210,12 @@ def get_callbacks(args: argparse.Namespace, checkpoint_dir: Path) -> list[BaseCa
 def main():
     args = parse_args()
 
-    obs_builder = init_obs_builder(args)
+    obs_wrapper = init_obs_wrapper(args)
     ports = init_ports(args)
     checkpoint_dir = init_checkpoint_dir(args)
     wandb_init(args, checkpoint_dir)
 
-    env = SubprocVecEnv(get_env_fns(args, ports, obs_builder))
+    env = SubprocVecEnv(get_env_fns(args, ports, obs_wrapper))
     env = VecNormalize(
         env,
         training=True,

@@ -1,5 +1,6 @@
 from typing import Dict, SupportsFloat, Any
 import numpy as np
+
 from mlagents_envs.environment import UnityEnvironment
 from mlagents_envs.envs.unity_gym_env import UnityToGymWrapper
 from mlagents_envs.side_channel.engine_configuration_channel import (
@@ -8,50 +9,14 @@ from mlagents_envs.side_channel.engine_configuration_channel import (
 from mlagents_envs.side_channel.environment_parameters_channel import (
     EnvironmentParametersChannel,
 )
-from libimmortal.utils import colormap_to_ids_and_onehot
 from libimmortal.utils.reward import ImmortalRewardShaper
+from libimmortal.utils.obs_builder import BasicObsWrapper
 import gymnasium as gym
 from gymnasium.wrappers import PassiveEnvChecker
 from gymnasium import spaces
 import shimmy
 
 gym.register_envs(shimmy)
-
-
-class BasicObsWrapper(gym.ObservationWrapper):
-    def __init__(self, env):
-        super().__init__(env)
-        self.observation_space = spaces.Dict(
-            {
-                "image": spaces.Box(
-                    low=0, high=1, shape=(11, 90, 160), dtype=np.float32
-                ),
-                "vector": spaces.Box(
-                    low=-np.inf, high=np.inf, shape=(103,), dtype=np.float32
-                ),
-                "id_map": spaces.Box(low=0, high=10, shape=(90, 160), dtype=np.int32),
-                "raw_graphic": spaces.Box(
-                    low=0, high=255, shape=(3, 90, 160), dtype=np.uint8
-                ),
-            }
-        )
-
-    def observation(self, observation: list[np.ndarray]):
-        graphic_obs, vector_obs = observation
-        graphic_obs = graphic_obs.flatten().reshape(90, 160, 3)  # Fix shape (HWC)
-
-        id_map, onehot = colormap_to_ids_and_onehot(graphic_obs)
-        onehot = onehot.astype(np.float32)
-        vector_obs = vector_obs.astype(np.float32)
-        id_map = id_map.astype(np.int32)
-        graphic_obs = np.transpose(graphic_obs, (2, 0, 1))  # (CHW)
-
-        return {
-            "image": onehot,
-            "vector": vector_obs,
-            "id_map": id_map,
-            "raw_graphic": graphic_obs,
-        }
 
 
 class BasicActionWrapper(gym.ActionWrapper):

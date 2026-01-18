@@ -1,106 +1,92 @@
-import numpy as np
-from gym import spaces
 from collections import deque
-from abc import ABC, abstractmethod
-
-from libimmortal.utils.enums import *
-from libimmortal.utils import colormap_to_ids_and_onehot, parse_observation
-
-"""
-class GraphicObservationColorMap:
-    BLANK = [0, 0, 0]               # Black
-    WALL = [0, 0, 255]              # Blue
-    PLATFORM = [113, 69, 1]         # Purple
-    TURRET = [179, 0, 255]          # Magenta
-    BOMBKID = [255, 2, 0]           # Red
-    SKELETON = [255, 255, 255]      # White
-    ARROW = [255, 255, 0]           # Yellow
-    EXPLOSION = [255, 127, 0]       # Orange
-    KNIGHT = [4, 255, 210]          # Cyan
-    GOAL = [2, 255, 0]              # Green
-    KNIGHT_ATTACK = [128, 128, 204] # Light Blue
-"""
+import numpy as np
+import gymnasium as gym
+from gymnasium import spaces
+from libimmortal.utils import colormap_to_ids_and_onehot
 
 
-def fix_obs_structure(obs):
-    h, w = 90, 160
-    corrected_hwc = obs.reshape(h, w, 3)
-    corrected_chw = np.transpose(corrected_hwc, (2, 0, 1))
-    return corrected_chw
-
-
-class ObsBuilder(ABC):
-    @property
-    @abstractmethod
-    def observation_space(self) -> spaces.Space:
-        pass
-
-    @abstractmethod
-    def build(self, raw_obs) -> dict:
-        pass
-
-
-class BasicObsBuilder(ObsBuilder):
-    def __init__(self):
-        self._observation_space = spaces.Dict(
+class BasicObsWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self.observation_space = spaces.Dict(
             {
                 "image": spaces.Box(
-                    low=0, high=255, shape=(11, 90, 160), dtype=np.float32
+                    low=0, high=1, shape=(11, 90, 160), dtype=np.float32
                 ),
                 "vector": spaces.Box(
                     low=-np.inf, high=np.inf, shape=(103,), dtype=np.float32
                 ),
+                "id_map": spaces.Box(low=0, high=10, shape=(90, 160), dtype=np.int32),
+                "raw_graphic": spaces.Box(
+                    low=0, high=255, shape=(3, 90, 160), dtype=np.uint8
+                ),
             }
         )
 
-    @property
-    def observation_space(self) -> spaces.Space:
-        return self._observation_space
+    def observation(self, observation: list[np.ndarray]):
+        graphic_obs, vector_obs = observation
+        graphic_obs = graphic_obs.flatten().reshape(90, 160, 3)  # Fix shape (HWC)
 
-    def build(self, raw_obs):
-        graphic_obs, vector_obs = parse_observation(raw_obs)
-        graphic_obs = fix_obs_structure(graphic_obs)
         id_map, onehot = colormap_to_ids_and_onehot(graphic_obs)
-
-        # normalize
         onehot = onehot.astype(np.float32)
         vector_obs = vector_obs.astype(np.float32)
+        id_map = id_map.astype(np.int32)
+        graphic_obs = np.transpose(graphic_obs, (2, 0, 1))  # (CHW)
 
-        return {"image": onehot, "vector": vector_obs}  # Dict
+        return {
+            "image": onehot,
+            "vector": vector_obs,
+            "id_map": id_map,
+            "raw_graphic": graphic_obs,
+        }
 
 
-class ArrowObsBuilder(ObsBuilder):
-    def __init__(self, history_len=2, MAX_ARROWS=3):
-        self._observation_space = spaces.Dict(
+class ArrowObsWrapper(BasicObsWrapper):
+    def __init__(self, env: gym.Env, history_len: int = 2, max_arrows: int = 3):
+        super().__init__(env)
+        self.history_len = history_len
+        self.max_arrows = max_arrows
+        self.arrow_history = deque(maxlen=history_len)
+
+        self.observation_space = spaces.Dict(
             {
+                "image": spaces.Box(
+                    low=0, high=1, shape=(11, 90, 160), dtype=np.float32
+                ),
                 "vector": spaces.Box(
                     low=-np.inf,
                     high=np.inf,
-                    shape=(113 + 10 * MAX_ARROWS,),
+                    shape=(103 + 10 * max_arrows,),
                     dtype=np.float32,
-                )
+                ),
+                "id_map": spaces.Box(low=0, high=10, shape=(90, 160), dtype=np.int32),
+                "raw_graphic": spaces.Box(
+                    low=0, high=255, shape=(3, 90, 160), dtype=np.uint8
+                ),
             }
         )
-        self.history_len = history_len
-        self.arrow_history = deque(maxlen=history_len)
-        self.MAX_ARROWS = MAX_ARROWS
 
-    @property
-    def observation_space(self) -> spaces.Space:
-        return self._observation_space
+    def reset(self, **kwargs):
+        self.arrow_history.clear()
+        return super().reset(**kwargs)
 
-    def build(self, raw_obs):
-        graphic_obs, vector_obs = parse_observation(raw_obs)
-        graphic_obs = fix_obs_structure(graphic_obs)
-        id_map, onehot = colormap_to_ids_and_onehot(graphic_obs)
+    def observation(self, observation: list[np.ndarray]):
+        obs_dict = super().observation(observation)
 
-        arrow_obs = np.zeros((self.MAX_ARROWS, 10), dtype=np.float32)
+        arrow_obs = self._extract_arrow_info(obs_dict["id_map"])
+
+        obs_dict["vector"] = np.concatenate([obs_dict["vector"], arrow_obs.flatten()])
+
+        return obs_dict
+
+    def _extract_arrow_info(self, id_map: np.ndarray) -> np.ndarray:
+        arrow_obs = np.zeros((self.max_arrows, 10), dtype=np.float32)
 
         arrows_y, arrows_x = np.where(id_map == 6)
         arrows = list(zip(arrows_x, arrows_y))
         self.arrow_history.append(arrows)
         for i, arrow in enumerate(arrows):
-            if i >= self.MAX_ARROWS:
+            if i >= self.max_arrows:
                 break
 
             if len(self.arrow_history) >= 2:
@@ -114,18 +100,5 @@ class ArrowObsBuilder(ObsBuilder):
                 vx, vy = 0, 0
 
             arrow_obs[i] = np.array([0, 0, 0, 1, arrow[0], arrow[1], vx, vy, 0, 0])
-        self.arrow_history.popleft()
 
-        player_obs = vector_obs[0:13]
-        enemy_obs = vector_obs[13:103].reshape(10, 9)
-        enemy_obs = np.insert(
-            enemy_obs, 3, np.full((10, 1), 0), axis=1
-        )  # ENEMY_TYPE_ARROW
-        vector_obs = np.concatenate(
-            [player_obs, enemy_obs.flatten(), arrow_obs.flatten()]
-        )
-
-        # normalize
-        vector_obs = vector_obs.astype(np.float32)
-
-        return {"vector": vector_obs}  # Dict
+        return arrow_obs

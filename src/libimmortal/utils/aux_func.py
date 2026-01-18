@@ -117,20 +117,6 @@ def find_n_free_tcp_ports(n: int, host: str = "127.0.0.1") -> List[int]:
     return ports
 
 
-def parse_observation(
-    observation: Union[Dict[str, np.ndarray], List[np.ndarray]],
-) -> Tuple[np.ndarray, np.ndarray]:
-    if isinstance(observation, dict):
-        graphic_obs = observation["graphic"]
-        vector_obs = observation["vector"]
-    elif isinstance(observation, list) and len(observation) == 2:
-        graphic_obs, vector_obs = observation
-    else:
-        raise ValueError("Invalid observation format")
-
-    return fix_obs_structure(graphic_obs), vector_obs
-
-
 __all__ = [
     "ColorMapEncoder",
     "colormap_to_ids_and_onehot",
@@ -139,16 +125,7 @@ __all__ = [
     "find_n_free_tcp_ports",
     "calculate_distance_map",
     "get_grid_pos",
-    "parse_observation",
-    "fix_obs_structure",
 ]
-
-
-def fix_obs_structure(obs: np.ndarray) -> np.ndarray:
-    h, w = 90, 160
-    corrected_hwc = obs.reshape(h, w, 3)
-    corrected_hwc = np.transpose(corrected_hwc, (2, 0, 1))
-    return corrected_hwc
 
 
 def calculate_distance_map(id_map: np.ndarray) -> np.ndarray:
