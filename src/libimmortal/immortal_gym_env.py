@@ -10,7 +10,7 @@ from mlagents_envs.side_channel.environment_parameters_channel import (
     EnvironmentParametersChannel,
 )
 from libimmortal.utils.reward import ImmortalRewardShaper
-from libimmortal.utils.obs_builder import BasicObsWrapper
+from libimmortal.utils.obs_wrapper import BasicObsWrapper
 import gymnasium as gym
 from gymnasium.wrappers import PassiveEnvChecker
 from gymnasium import spaces

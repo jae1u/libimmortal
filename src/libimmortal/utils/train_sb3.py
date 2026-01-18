@@ -13,7 +13,7 @@ import wandb
 from wandb.integration.sb3 import WandbCallback
 
 from libimmortal.immortal_gym_env import ImmortalGymEnv
-from libimmortal.utils.obs_builder import BasicObsWrapper, ArrowObsWrapper
+from libimmortal.utils.obs_wrapper import BasicObsWrapper, ArrowObsWrapper
 from libimmortal.utils import find_n_free_tcp_ports
 
 
