@@ -1,60 +1,37 @@
 import numpy as np
-from libimmortal.utils import colormap_to_ids_and_onehot
 from libimmortal.utils.aux_func import calculate_distance_map, get_grid_pos
+from typing import Dict
 
 
 class ImmortalRewardShaper:
-    def __init__(self, goal_reward=100.0):
-        self.goal_reward = goal_reward
-        self.distance_map = None
-        self.prev_grid_distance = None
+    GOAL_REWARD = 100.0
+    BAD_REWARD = -500.0
 
-    def reset(self, vector_obs, graphic_obs=None):
-        if graphic_obs is not None:
-            id_map, _ = colormap_to_ids_and_onehot(graphic_obs)
+    def __init__(self):
+        self.distance_map = None
+
+    def compute_reward(self, observation: Dict[str, np.ndarray], original_reward):
+        if self.distance_map is None:
+            id_map = observation["id_map"]
             self.distance_map = calculate_distance_map(id_map)
 
-            player_x = vector_obs[0]
-            player_y = -vector_obs[1]
-            grid_x, grid_y = get_grid_pos(player_x, player_y)
+        if float(original_reward) > 0:
+            return self.GOAL_REWARD
 
-            if (
-                0 <= grid_y < self.distance_map.shape[0]
-                and 0 <= grid_x < self.distance_map.shape[1]
-            ):
-                self.prev_grid_distance = float(self.distance_map[grid_y, grid_x])
-            else:
-                self.prev_grid_distance = None
-        else:
-            self.distance_map = None
-            self.prev_grid_distance = None
+        vector_obs = observation["vector"]
+        player_x = vector_obs[0]
+        player_y = -vector_obs[1]
+        grid_x, grid_y = get_grid_pos(player_x, player_y)
 
-    def compute_reward(
-        self, vector_obs, original_reward, done, truncated, graphic_obs=None
-    ):
-        # Goal reached
-        if original_reward > 0:
-            return self.goal_reward
-
-        if self.distance_map is not None:
-            # Use grid-based distance
-            player_x = vector_obs[0]
-            player_y = -vector_obs[1]
-            grid_x, grid_y = get_grid_pos(player_x, player_y)
-
-            if not (
-                0 <= grid_y < self.distance_map.shape[0]
-                and 0 <= grid_x < self.distance_map.shape[1]
-            ):
-                return -500.0
-
-            player_distance = float(self.distance_map[grid_y, grid_x])
-        else:
-            # Use vector_obs distance
-            player_distance = float(vector_obs[11])
+        if not (
+            0 <= grid_y < self.distance_map.shape[0]
+            and 0 <= grid_x < self.distance_map.shape[1]
+        ):
+            return self.BAD_REWARD
+        player_distance = float(self.distance_map[grid_y, grid_x])
 
         if player_distance == 0:
-            reward = -500.0
+            reward = self.BAD_REWARD
         else:
             reward = -player_distance
 
