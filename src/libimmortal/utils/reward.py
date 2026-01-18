@@ -1,6 +1,8 @@
 import numpy as np
 from libimmortal.utils.aux_func import calculate_distance_map, get_grid_pos
 from typing import Dict
+import pickle
+from pathlib import Path
 
 
 class ImmortalRewardShaper:
@@ -8,12 +10,19 @@ class ImmortalRewardShaper:
     BAD_REWARD = -500.0
 
     def __init__(self):
-        self.distance_map = None
+        self.distance_map_path = Path("./distance_map.pkl")
+        if self.distance_map_path.exists():
+            with open(self.distance_map_path, "rb") as f:
+                self.distance_map = pickle.load(f)
+        else:
+            self.distance_map = None
 
     def compute_reward(self, observation: Dict[str, np.ndarray], original_reward):
         if self.distance_map is None:
             id_map = observation["id_map"]
             self.distance_map = calculate_distance_map(id_map)
+            with open(self.distance_map_path, "wb") as f:
+                pickle.dump(self.distance_map, f)
 
         if float(original_reward) > 0:
             return self.GOAL_REWARD
