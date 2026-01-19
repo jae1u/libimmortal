@@ -67,6 +67,43 @@ class GymnasiumWrapper(gym.Env):
         # 이를 하나의 Discrete space로 변환: 2^8 = 256 가지
         original_action_space = self.env.env.action_space
         
+        # Shirnked Actoin Space: Discrete(9)
+        # vertical: None/Up/Down (3)
+        # horizontal: None/Left/Right (3)
+        # 3x3 = 9
+        self.action_space = spaces.Discrete(9)
+        
+        # idx = v*3 + h
+        # v: 0=None, 1=Up, 2=Down
+        # h: 0=None, 1=Left, 2=Right
+        self._idx_to_action8 = []
+        for v in range(3):
+            for h in range(3):
+                a = np.zeros(8, dtype=np.int32)
+        
+                # vertical
+                if v == 1:
+                    a[ActionIndex.MOVE_UP] = 1
+                elif v == 2:
+                    a[ActionIndex.MOVE_DOWN] = 1
+        
+                # horizontal
+                if h == 1:
+                    a[ActionIndex.MOVE_LEFT] = 1
+                elif h == 2:
+                    a[ActionIndex.MOVE_RIGHT] = 1
+        
+                # attack는 항상 0 (비활성화)
+                a[ActionIndex.ATTACK_UP] = 0
+                a[ActionIndex.ATTACK_LEFT] = 0
+                a[ActionIndex.ATTACK_DOWN] = 0
+                a[ActionIndex.ATTACK_RIGHT] = 0
+        
+                self._idx_to_action8.append(a)
+        
+        self._idx_to_action8 = np.stack(self._idx_to_action8, axis=0)  # (9, 8)
+
+        
         if hasattr(original_action_space, 'nvec'):
             self.action_dims = original_action_space.nvec
             self.n_actions = int(np.prod(self.action_dims))
@@ -119,16 +156,10 @@ class GymnasiumWrapper(gym.Env):
         self.min_distance_this_ep = float('inf')
     
     def _discrete_to_multi_discrete(self, action):
-        if not self.is_multi_discrete:
-            return action
-        multi_action = []
-        remaining = int(action)
-        for dim in reversed(self.action_dims):
-            multi_action.append(remaining % dim)
-            remaining //= dim
-        multi_action.reverse()
-        
-        return np.array(multi_action, dtype=np.int32)
+        action_idx = int(action)
+        if not (0 <= action_idx <= 8):
+            raise ValueError(f"Action must be in [0,8], got {action_idx}")
+        return self._idx_to_action8[action_idx]
     
     def _count_enemies(self, vector_obs):
         count = 0
