@@ -11,6 +11,7 @@ from mlagents_envs.side_channel.environment_parameters_channel import (
 )
 from libimmortal.utils.reward import ImmortalRewardShaper
 from libimmortal.utils.obs_wrapper import BasicObsWrapper
+from libimmortal.utils.enums import ActionIndex
 import gymnasium as gym
 from gymnasium.wrappers import PassiveEnvChecker
 from gymnasium import spaces
@@ -20,9 +21,12 @@ gym.register_envs(shimmy)
 
 
 class BasicActionWrapper(gym.ActionWrapper):
+    VERTICAL_MAP = {1: ActionIndex.MOVE_UP, 2: ActionIndex.MOVE_DOWN}
+    HORIZONTAL_MAP = {1: ActionIndex.MOVE_LEFT, 2: ActionIndex.MOVE_RIGHT}
+
     def __init__(self, env):
         super().__init__(env)
-        self.action_space = spaces.MultiDiscrete([2, 2, 2, 2])
+        self.action_space = spaces.MultiDiscrete([3, 3])
 
     def step(
         self, action
@@ -37,7 +41,13 @@ class BasicActionWrapper(gym.ActionWrapper):
         return obs, reward, terminated, truncated, info
 
     def action(self, action: np.ndarray) -> np.ndarray:
-        return np.pad(action, (0, 4))
+        _action = np.zeros(4, dtype=action.dtype)
+        vertical, horizontal = action
+        if vertical in self.VERTICAL_MAP:
+            _action[self.VERTICAL_MAP[vertical]] = 1
+        if horizontal in self.HORIZONTAL_MAP:
+            _action[self.HORIZONTAL_MAP[horizontal]] = 1
+        return np.pad(_action, (0, 4))
 
 
 class ImmortalGymEnv(gym.Wrapper):
