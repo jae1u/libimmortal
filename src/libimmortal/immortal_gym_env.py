@@ -105,10 +105,21 @@ class ImmortalGymEnv(gym.Wrapper):
         return obs, shaped_reward, terminated, truncated, info
 
 
+def save_image(obs: np.ndarray):
+    from PIL import Image
+
+    assert "raw_graphic" in obs, "Enable 'no_filter_observation' to save raw image."
+    raw_image = obs["raw_graphic"]
+    img = Image.fromarray(raw_image.transpose(1, 2, 0))
+    img.save("debug_obs.png")
+
+
 if __name__ == "__main__":
-    env = ImmortalGymEnv()
+    env = ImmortalGymEnv(no_filter_observation=True)
     obs, info = env.reset()
     action = env.action_space.sample()
     obs, reward, terminated, truncated, info = env.step(action)
     print(reward)
     env.close()
+
+    save_image(obs)
