@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Dict, Tuple, Sequence, Type, List, Union
+from typing import Dict, Tuple, Type, List
 import numpy as np
 from .enums import GraphicObservationColorMap
 import socket
