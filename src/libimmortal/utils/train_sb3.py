@@ -2,18 +2,15 @@ import argparse
 from pathlib import Path
 import gymnasium as gym
 import torch
-from typing import Callable
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
-from stable_baselines3.common.callbacks import (
-    BaseCallback,
-)
+from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.monitor import Monitor
 import wandb
 from wandb.integration.sb3 import WandbCallback
 
 from libimmortal.immortal_gym_env import ImmortalGymEnv
-from libimmortal.utils.obs_wrapper import BasicObsWrapper, ArrowObsWrapper
+from libimmortal.utils.obs_wrapper import ArrowObsWrapper
 from libimmortal.utils import find_n_free_tcp_ports
 
 
@@ -40,23 +37,16 @@ class VecNormalizeCheckpointCallback(BaseCallback):
                 stats_path = (
                     self.save_path / f"vec_normalize_{self.num_timesteps}_steps.pkl"
                 )
-                self.training_env.save(stats_path)
+                getattr(self.training_env, "save")(stats_path)
                 if self.verbose > 0:
                     print(f"Saving VecNormalize stats to {stats_path}")
 
         return True
 
 
-def make_env(
-    game_path,
-    port,
-    time_scale=2.0,
-    seed=42,
-    max_steps=2000,
-    obs_wrapper: type[gym.ObservationWrapper] = BasicObsWrapper,
-) -> Callable[[], gym.Env]:
+def make_env(**kwargs):
     def _init() -> gym.Env:
-        env = ImmortalGymEnv(game_path, port, time_scale, seed, max_steps, obs_wrapper)
+        env = ImmortalGymEnv(**kwargs)
         env = Monitor(env)
         return env
 
@@ -66,11 +56,8 @@ def make_env(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="SB3 PPO 학습")
 
-    parser.add_argument(
-        "--game_path",
-        type=str,
-        default="../immortal_suffering/immortal_suffering_linux_build.x86_64",
-    )
+    # fmt: off
+    parser.add_argument("--game_path", type=str, default="../immortal_suffering/immortal_suffering_linux_build.x86_64")
     parser.add_argument("--port", type=int, default=None)
     parser.add_argument("--n_envs", type=int, default=4)
     parser.add_argument("--time_scale", type=float, default=1.0)
@@ -79,12 +66,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--learning_rate", type=float, default=3e-4)
     parser.add_argument("--n_steps", type=int, default=2048)
     parser.add_argument("--batch_size", type=int, default=2048)
-    parser.add_argument(
-        "--n_epochs", type=int, default=20, help="각 업데이트당 반복 횟수"
-    )
-    parser.add_argument(
-        "--max_steps", type=int, default=2000, help="에피소드 최대 스텝 (truncate)"
-    )
+    parser.add_argument("--n_epochs", type=int, default=20, help="각 업데이트당 반복 횟수")
+    parser.add_argument("--max_steps", type=int, default=2000, help="에피소드 최대 스텝 (truncate)")
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--gae_lambda", type=float, default=0.95)
     parser.add_argument("--clip_range", type=float, default=0.2)
@@ -93,36 +76,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max_grad_norm", type=float, default=0.5)
     parser.add_argument("--checkpoint_dir", type=str, default="./checkpoints")
     parser.add_argument("--save_freq", type=int, default=10000)
-    parser.add_argument(
-        "--policy",
-        type=str,
-        default="MultiInputPolicy",
-        help="MultiInputPolicy for Dict observations",
-    )
+    parser.add_argument("--policy", type=str, default="MultiInputPolicy", help="MultiInputPolicy for Dict observations")
     parser.add_argument("--use_wandb", action="store_true", help="Use WandB logging")
     parser.add_argument("--wandb_project", type=str, default="immortal-suffering-sb3")
     parser.add_argument("--wandb_run_name", type=str, default=None)
-    parser.add_argument(
-        "--obs_type", type=str, default="basic", choices=["basic", "arrow"]
-    )
-    parser.add_argument(
-        "--resume_from",
-        type=str,
-        default=None,
-        help="Path to checkpoint to resume from",
-    )
+    parser.add_argument("--obs_type", type=str, default="basic", choices=["basic", "arrow"])
+    parser.add_argument("--resume_from", type=str, default=None, help="Path to checkpoint to resume from")
+    # fmt: on
 
     return parser.parse_args()
 
 
-def init_obs_wrapper(args: argparse.Namespace) -> type[BasicObsWrapper]:
+def init_obs_wrapper(args: argparse.Namespace):
     match args.obs_type:
-        case "basic":
-            obs_wrapper = BasicObsWrapper
         case "arrow":
             obs_wrapper = ArrowObsWrapper
         case _:
-            obs_wrapper = BasicObsWrapper
+            obs_wrapper = None
     return obs_wrapper
 
 
@@ -162,6 +132,7 @@ def wandb_init(args: argparse.Namespace, checkpoint_dir: Path):
         monitor_gym=True,
         save_code=True,
     )
+    assert wandb.run is not None
 
     if run_id is None:
         run_id_file.write_text(wandb.run.id)
@@ -170,17 +141,15 @@ def wandb_init(args: argparse.Namespace, checkpoint_dir: Path):
     print(f"WandB URL: {wandb.run.get_url()}")
 
 
-def get_env_fns(
-    args: argparse.Namespace, ports: list[int], obs_wrapper: type[BasicObsWrapper]
-) -> list[Callable[[], gym.Env]]:
+def get_env_fns(args: argparse.Namespace, ports, obs_wrapper):
     env_fns = [
         make_env(
-            args.game_path,
-            ports[i],
-            args.time_scale,
-            args.seed + i,
-            args.max_steps,
-            obs_wrapper,
+            game_path=args.game_path,
+            port=ports[i],
+            time_scale=args.time_scale,
+            seed=args.seed + i,
+            max_steps=args.max_steps,
+            obs_wrapper_class=obs_wrapper,
         )
         for i in range(args.n_envs)
     ]

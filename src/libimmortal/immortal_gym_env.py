@@ -61,8 +61,6 @@ class ImmortalGymEnv(gym.Wrapper):
         seed: int = 42,
         max_steps: int = 2000,
         obs_wrapper_class: type[gym.ObservationWrapper] = DefaultObsWrapper,
-        width: int = 720,
-        height: int = 480,
     ):
         _engine_channel = EngineConfigurationChannel()
         _env_param_channel = EnvironmentParametersChannel()
@@ -76,8 +74,6 @@ class ImmortalGymEnv(gym.Wrapper):
             time_scale=time_scale,
             target_frame_rate=-1,
             capture_frame_rate=0,
-            width=width,
-            height=height,
             quality_level=0,
         )
         _env_param_channel.set_float_parameter("seed", float(seed))
