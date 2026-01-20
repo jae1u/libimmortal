@@ -63,6 +63,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max_steps", type=int, default=2000, help="에피소드 최대 스텝 (truncate)")
     parser.add_argument("--obs_type", type=str, default=None, choices=["arrow"])
+    parser.add_argument("--no-filter-observation", action="store_true")
 
     parser.add_argument("--n_envs", type=int, default=4)
     parser.add_argument("--total_timesteps", type=int, default=10000000)
@@ -151,6 +152,7 @@ def get_env_fns(args: argparse.Namespace, ports, obs_wrapper):
             seed=args.seed + i,
             max_steps=args.max_steps,
             obs_wrapper_class=obs_wrapper,
+            no_filter_observation=args.no_filter_observation,
         )
         for i in range(args.n_envs)
     ]

@@ -61,6 +61,7 @@ class ImmortalGymEnv(gym.Wrapper):
         seed: int = 42,
         max_steps: int = 2000,
         obs_wrapper_class: type[gym.ObservationWrapper] = DefaultObsWrapper,
+        no_filter_observation: bool = False,
     ):
         _engine_channel = EngineConfigurationChannel()
         _env_param_channel = EnvironmentParametersChannel()
@@ -90,7 +91,8 @@ class ImmortalGymEnv(gym.Wrapper):
             disable_env_checker=True,
         )
         env = obs_wrapper_class(env)
-        env = FilterObservation(env, filter_keys=["image", "vector"])
+        if not no_filter_observation:
+            env = FilterObservation(env, filter_keys=["image", "vector"])
         env = BasicActionWrapper(env)
         env = PassiveEnvChecker(env)
         super().__init__(env)
