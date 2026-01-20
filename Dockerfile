@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 SHELL ["/bin/bash", "-c"]
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -25,19 +25,19 @@ COPY docker/start_xvfb.sh /usr/local/bin/start_xvfb.sh
 RUN chmod +x /usr/local/bin/start_xvfb.sh
 ENV LIBGL_ALWAYS_SOFTWARE=1
 
-# Install Python 3.10.12
+# Install Python 3.10
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /root
-RUN uv venv .venv --python 3.10.12
+RUN uv venv .venv --python 3.10
 ENV PATH="/root/.venv/bin:$PATH"
 ENV VIRTUAL_ENV="/root/.venv"
+
+# Install Pytorch
+RUN uv pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 
 # Copy and install requirements.txt
 COPY requirements.txt /root/requirements.txt
 RUN uv pip install -r /root/requirements.txt && rm /root/requirements.txt
-
-# Install Pytorch
-RUN uv pip install torch==2.1.1 torchvision==0.16.1 torchaudio==2.1.1 --index-url https://download.pytorch.org/whl/cu121
 
 # Download linux game build
 ARG GAME_VER
