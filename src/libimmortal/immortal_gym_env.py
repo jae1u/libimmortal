@@ -10,10 +10,10 @@ from mlagents_envs.side_channel.environment_parameters_channel import (
     EnvironmentParametersChannel,
 )
 from libimmortal.utils.reward import ImmortalRewardShaper
-from libimmortal.utils.obs_wrapper import BasicObsWrapper
+from libimmortal.utils.obs_wrapper import DefaultObsWrapper
 from libimmortal.utils.enums import ActionIndex
 import gymnasium as gym
-from gymnasium.wrappers import PassiveEnvChecker
+from gymnasium.wrappers import PassiveEnvChecker, FilterObservation
 from gymnasium import spaces
 import shimmy
 
@@ -60,7 +60,7 @@ class ImmortalGymEnv(gym.Wrapper):
         time_scale: float = 2.0,
         seed: int = 42,
         max_steps: int = 2000,
-        obs_wrapper_class: type[gym.ObservationWrapper] = BasicObsWrapper,
+        obs_wrapper_class: type[gym.ObservationWrapper] = DefaultObsWrapper,
         width: int = 720,
         height: int = 480,
     ):
@@ -94,6 +94,7 @@ class ImmortalGymEnv(gym.Wrapper):
             disable_env_checker=True,
         )
         env = obs_wrapper_class(env)
+        env = FilterObservation(env, filter_keys=["image", "vector"])
         env = BasicActionWrapper(env)
         env = PassiveEnvChecker(env)
         super().__init__(env)
