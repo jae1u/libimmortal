@@ -10,7 +10,7 @@ import wandb
 from wandb.integration.sb3 import WandbCallback
 
 from libimmortal.immortal_gym_env import ImmortalGymEnv
-from libimmortal.utils.obs_wrapper import ArrowObsWrapper
+from libimmortal.utils.obs_wrapper import DefaultObsWrapper, ArrowObsWrapper
 from libimmortal.utils import find_n_free_tcp_ports
 
 
@@ -58,16 +58,18 @@ def parse_args() -> argparse.Namespace:
 
     # fmt: off
     parser.add_argument("--game_path", type=str, default="../immortal_suffering/immortal_suffering_linux_build.x86_64")
-    parser.add_argument("--port", type=int, default=None)
-    parser.add_argument("--n_envs", type=int, default=4)
-    parser.add_argument("--time_scale", type=float, default=1.0)
+    parser.add_argument("--port", type=int, default=5005)
+    parser.add_argument("--time_scale", type=float, default=2.0)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--max_steps", type=int, default=2000, help="에피소드 최대 스텝 (truncate)")
+    parser.add_argument("--obs_type", type=str, default=None, choices=["arrow"])
+
+    parser.add_argument("--n_envs", type=int, default=4)
     parser.add_argument("--total_timesteps", type=int, default=10000000)
     parser.add_argument("--learning_rate", type=float, default=3e-4)
     parser.add_argument("--n_steps", type=int, default=2048)
     parser.add_argument("--batch_size", type=int, default=2048)
     parser.add_argument("--n_epochs", type=int, default=20, help="각 업데이트당 반복 횟수")
-    parser.add_argument("--max_steps", type=int, default=2000, help="에피소드 최대 스텝 (truncate)")
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--gae_lambda", type=float, default=0.95)
     parser.add_argument("--clip_range", type=float, default=0.2)
@@ -80,7 +82,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use_wandb", action="store_true", help="Use WandB logging")
     parser.add_argument("--wandb_project", type=str, default="immortal-suffering-sb3")
     parser.add_argument("--wandb_run_name", type=str, default=None)
-    parser.add_argument("--obs_type", type=str, default="basic", choices=["basic", "arrow"])
     parser.add_argument("--resume_from", type=str, default=None, help="Path to checkpoint to resume from")
     # fmt: on
 
@@ -92,7 +93,7 @@ def init_obs_wrapper(args: argparse.Namespace):
         case "arrow":
             obs_wrapper = ArrowObsWrapper
         case _:
-            obs_wrapper = None
+            obs_wrapper = DefaultObsWrapper
     return obs_wrapper
 
 
