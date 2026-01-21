@@ -88,6 +88,25 @@ class DefaultObsWrapper(gym.ObservationWrapper):
 
 
 class NormalizedVecWrapper(gym.ObservationWrapper):
+    """
+    return a normalized vector observation
+    default ranges from -1 to 1
+    CUL_DAMAGE, TIME_ELAPSED are just log scaled
+    """
+
+    POS_X_MIN = -15.0
+    POS_X_MAX = 16.385
+    POS_Y_MIN = -11.0
+    POS_Y_MAX = 11.0
+    MAX_DISTANCE = 32.0
+    HEALTH_MIN = 0.0
+    SKELETON_HEALTH_MAX = 20.0
+    BOMBKID_HEALTH_MAX = 1.0
+    TURRET_HEALTH_MAX = 100.0
+
+    VEL_MIN = -45.0  # Assumed
+    VEL_MAX = 45.0  # Assumed
+
     def __init__(self, env):
         super().__init__(env)
         self.observation_space = spaces.Dict(
@@ -95,9 +114,7 @@ class NormalizedVecWrapper(gym.ObservationWrapper):
                 "image": spaces.Box(
                     low=0, high=1, shape=(11, 90, 160), dtype=np.float32
                 ),
-                "vector": spaces.Box(
-                    low=-np.inf, high=np.inf, shape=(103,), dtype=np.float32
-                ),
+                "vector": spaces.Box(low=-1, high=1, shape=(103,), dtype=np.float32),
                 "id_map": spaces.Box(low=0, high=10, shape=(90, 160), dtype=np.int32),
                 "raw_graphic": spaces.Box(
                     low=0, high=255, shape=(3, 90, 160), dtype=np.uint8
@@ -107,7 +124,97 @@ class NormalizedVecWrapper(gym.ObservationWrapper):
 
     def observation(self, observation: dict[str, np.ndarray]):
         vector_obs = observation["vector"]
+
+        player_obs = vector_obs[:13]
+        player_obs[PlayerObs.POS_X] = self._normalize(
+            player_obs[PlayerObs.POS_X], self.POS_X_MIN, self.POS_X_MAX
+        )
+        player_obs[PlayerObs.POS_Y] = self._normalize(
+            player_obs[PlayerObs.POS_Y], self.POS_Y_MIN, self.POS_Y_MAX
+        )
+        player_obs[PlayerObs.VEL_X] = self._normalize(
+            player_obs[PlayerObs.VEL_X], self.VEL_MIN, self.VEL_MAX
+        )
+        player_obs[PlayerObs.VEL_Y] = self._normalize(
+            player_obs[PlayerObs.VEL_Y], self.VEL_MIN, self.VEL_MAX
+        )
+        player_obs[PlayerObs.CUL_DAMAGE] = self._normalize(
+            np.log1p(player_obs[PlayerObs.CUL_DAMAGE]), 0.0, 500.0
+        )
+        player_obs[PlayerObs.IS_ACTIONABLE] = (
+            player_obs[PlayerObs.IS_ACTIONABLE] * 2 - 1
+        )
+        player_obs[PlayerObs.IS_HITTING] = player_obs[PlayerObs.IS_HITTING] * 2 - 1
+        player_obs[PlayerObs.IS_DOBBLE_JUMP_AVAILABLE] = (
+            player_obs[PlayerObs.IS_DOBBLE_JUMP_AVAILABLE] * 2 - 1
+        )
+        player_obs[PlayerObs.IS_ATTACKABLE] = (
+            player_obs[PlayerObs.IS_ATTACKABLE] * 2 - 1
+        )
+        player_obs[PlayerObs.GOAL_POS_X] = self._normalize(
+            player_obs[PlayerObs.GOAL_POS_X], self.POS_X_MIN, self.POS_X_MAX
+        )
+        player_obs[PlayerObs.GOAL_POS_Y] = self._normalize(
+            player_obs[PlayerObs.GOAL_POS_Y], self.POS_Y_MIN, self.POS_Y_MAX
+        )
+        player_obs[PlayerObs.GOAL_PLAYER_DIST] = self._normalize(
+            player_obs[PlayerObs.GOAL_PLAYER_DIST], 0.0, self.MAX_DISTANCE
+        )
+        player_obs[PlayerObs.TIME_ELAPSED] = self._normalize(
+            np.log1p(player_obs[PlayerObs.TIME_ELAPSED]), 0.0, 5.0
+        )
+
+        enemy_obs = []
+        for i in range(10):
+            base = 13 + i * 9
+            if vector_obs[base + 0] == 1.0:
+                MAX_HEALTH = self.SKELETON_HEALTH_MAX
+            elif vector_obs[base + 1] == 1.0:
+                MAX_HEALTH = self.BOMBKID_HEALTH_MAX
+            elif vector_obs[base + 2] == 1.0:
+                MAX_HEALTH = self.TURRET_HEALTH_MAX
+            else:
+                MAX_HEALTH = 1.0
+
+            enemy_pos_x = self._normalize(
+                vector_obs[base + 3], self.POS_X_MIN, self.POS_X_MAX
+            )
+            enemy_pos_y = self._normalize(
+                vector_obs[base + 4], self.POS_Y_MIN, self.POS_Y_MAX
+            )
+            enemy_vel_x = self._normalize(
+                vector_obs[base + 5], self.VEL_MIN, self.VEL_MAX
+            )
+            enemy_vel_y = self._normalize(
+                vector_obs[base + 6], self.VEL_MIN, self.VEL_MAX
+            )
+
+            health = self._normalize(vector_obs[base + 7], self.HEALTH_MIN, MAX_HEALTH)
+
+            enemy_obs.extend(
+                [
+                    vector_obs[base + 0] * 2 - 1,
+                    vector_obs[base + 1] * 2 - 1,
+                    vector_obs[base + 2] * 2 - 1,
+                    enemy_pos_x,
+                    enemy_pos_y,
+                    enemy_vel_x,
+                    enemy_vel_y,
+                    health,
+                    vector_obs[base + 8] * 2 - 1,
+                ]
+            )
+
+        observation["vector"] = np.concatenate([player_obs, enemy_obs]).astype(
+            np.float32
+        )
+
         return observation
+
+    @staticmethod
+    def _normalize(value, min_value, max_value):
+        value = np.clip(value, min_value, max_value)
+        return (value - min_value) / (max_value - min_value) * 2 - 1
 
 
 class ArrowObsWrapper(DefaultObsWrapper):
