@@ -10,7 +10,6 @@ import wandb
 from wandb.integration.sb3 import WandbCallback
 
 from libimmortal.immortal_gym_env import ImmortalGymEnv
-from libimmortal.utils.obs_wrapper import DefaultObsWrapper, ArrowObsWrapper
 from libimmortal.utils import find_n_free_tcp_ports
 
 
@@ -62,7 +61,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--time_scale", type=float, default=2.0)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max_steps", type=int, default=2000, help="에피소드 최대 스텝 (truncate)")
-    parser.add_argument("--obs_type", type=str, default=None, choices=["arrow"])
     parser.add_argument("--no-filter-observation", action="store_true")
 
     parser.add_argument("--n_envs", type=int, default=4)
@@ -89,15 +87,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def init_obs_wrapper(args: argparse.Namespace):
-    match args.obs_type:
-        case "arrow":
-            obs_wrapper = ArrowObsWrapper
-        case _:
-            obs_wrapper = DefaultObsWrapper
-    return obs_wrapper
-
-
 def init_ports(args: argparse.Namespace) -> list[int]:
     if args.port is None:
         ports = find_n_free_tcp_ports(args.n_envs)
@@ -115,7 +104,7 @@ def init_checkpoint_dir(args: argparse.Namespace) -> Path:
 def wandb_init(args: argparse.Namespace, checkpoint_dir: Path):
     if not args.use_wandb:
         return
-    default_name = f"ppo_{args.obs_type}_{args.seed}_{args.learning_rate}"
+    default_name = f"ppo_{args.seed}_{args.learning_rate}"
     run_name = args.wandb_run_name or default_name
     run_id_file = checkpoint_dir / "wandb_run_id.txt"
 
@@ -143,7 +132,7 @@ def wandb_init(args: argparse.Namespace, checkpoint_dir: Path):
     print(f"WandB URL: {wandb.run.get_url()}")
 
 
-def get_env_fns(args: argparse.Namespace, ports, obs_wrapper):
+def get_env_fns(args: argparse.Namespace, ports):
     env_fns = [
         make_env(
             game_path=args.game_path,
@@ -151,7 +140,6 @@ def get_env_fns(args: argparse.Namespace, ports, obs_wrapper):
             time_scale=args.time_scale,
             seed=args.seed + i,
             max_steps=args.max_steps,
-            obs_wrapper_class=obs_wrapper,
             no_filter_observation=args.no_filter_observation,
         )
         for i in range(args.n_envs)
@@ -182,12 +170,11 @@ def get_callbacks(args: argparse.Namespace, checkpoint_dir: Path) -> list[BaseCa
 def main():
     args = parse_args()
 
-    obs_wrapper = init_obs_wrapper(args)
     ports = init_ports(args)
     checkpoint_dir = init_checkpoint_dir(args)
     wandb_init(args, checkpoint_dir)
 
-    env = SubprocVecEnv(get_env_fns(args, ports, obs_wrapper))
+    env = SubprocVecEnv(get_env_fns(args, ports))
     env = VecNormalize(
         env,
         training=True,

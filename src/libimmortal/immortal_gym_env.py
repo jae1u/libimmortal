@@ -27,7 +27,6 @@ class ImmortalGymEnv(gym.Wrapper):
         time_scale: float = 2.0,
         seed: int = 42,
         max_steps: int = 2000,
-        obs_wrapper_class: type[gym.ObservationWrapper] = DefaultObsWrapper,
         no_filter_observation: bool = False,
     ):
         _engine_channel = EngineConfigurationChannel()
@@ -58,12 +57,13 @@ class ImmortalGymEnv(gym.Wrapper):
             disable_env_checker=True,
         )
         env = BasicActionWrapper(env)
-        env = DefaultObsWrapper(env)
+        env = DefaultObsWrapper(env)  # Fix and add onehot/id_map
 
-        env = ImmortalGradReward(env)
-        env = NormalizedRewardWrapper(env)
+        env = ImmortalGradReward(env)  # Edit reward using almost raw observation
+        env = NormalizedRewardWrapper(env)  # Normalize reward to 0~1
 
-        env = NormalizedVecWrapper(env)
+        env = NormalizedVecWrapper(env)  # Normalize vector observation to -1~1
+
         if not no_filter_observation:
             env = FilterObservation(env, filter_keys=["image", "vector"])
 
