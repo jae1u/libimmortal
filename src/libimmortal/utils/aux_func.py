@@ -5,7 +5,6 @@ import numpy as np
 from .enums import GraphicObservationColorMap
 import socket
 from contextlib import closing
-from collections import deque
 
 
 @dataclass(frozen=True)
@@ -123,63 +122,4 @@ __all__ = [
     "DEFAULT_ENCODER",
     "find_free_tcp_port",
     "find_n_free_tcp_ports",
-    "calculate_distance_map",
-    "get_grid_pos",
 ]
-
-
-def calculate_distance_map(id_map: np.ndarray) -> np.ndarray:
-    wall_id = DEFAULT_ENCODER.name2id["WALL"]
-    goal_id = DEFAULT_ENCODER.name2id["GOAL"]
-
-    id_map[45:53, 114:130] = wall_id
-    id_map[75:83, 120:144] = wall_id
-
-    rows, cols = id_map.shape
-    dist_map = np.full((rows, cols), -1, dtype=np.int32)
-    queue = deque()
-    goal_coords = np.argwhere(id_map == goal_id)
-
-    for r, c in goal_coords:
-        dist_map[r, c] = 0
-        queue.append((r, c))
-
-    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-    while queue:
-        curr_r, curr_c = queue.popleft()
-        current_dist = dist_map[curr_r, curr_c]
-
-        for dr, dc in directions:
-            next_r, next_c = curr_r + dr, curr_c + dc
-
-            if 0 <= next_r < rows and 0 <= next_c < cols:
-                if dist_map[next_r, next_c] == -1 and id_map[next_r, next_c] != wall_id:
-                    dist_map[next_r, next_c] = current_dist + 1
-                    queue.append((next_r, next_c))
-
-    return dist_map
-
-
-_grid_pos_data = None
-
-
-def get_grid_pos(player_x, player_y):
-    global _grid_pos_data
-
-    if _grid_pos_data is None:
-        # 프로젝트 루트에서 log.txt 찾기
-        import os
-
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.abspath(os.path.join(current_dir, "../../.."))
-        log_path = os.path.join(project_root, "log.txt")
-
-        data = np.loadtxt(log_path, delimiter=",")
-        slope_x, intercept_x = np.polyfit(data[:, 0], data[:, 2], 1)
-        slope_y, intercept_y = np.polyfit(data[:, 1], data[:, 3], 1)
-        _grid_pos_data = (slope_x, intercept_x, slope_y, intercept_y)
-
-    slope_x, intercept_x, slope_y, intercept_y = _grid_pos_data
-    gx = int(slope_x * player_x + intercept_x)
-    gy = int(slope_y * player_y + intercept_y)
-    return gx, gy

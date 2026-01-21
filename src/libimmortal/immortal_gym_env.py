@@ -9,7 +9,7 @@ from mlagents_envs.side_channel.engine_configuration_channel import (
 from mlagents_envs.side_channel.environment_parameters_channel import (
     EnvironmentParametersChannel,
 )
-from libimmortal.utils.reward import ImmortalRewardShaper
+from libimmortal.utils.reward_wrapper import ImmortalGradReward
 from libimmortal.utils.obs_wrapper import DefaultObsWrapper
 from libimmortal.utils.enums import ActionIndex
 import gymnasium as gym
@@ -90,19 +90,13 @@ class ImmortalGymEnv(gym.Wrapper):
             max_episode_steps=max_steps,
             disable_env_checker=True,
         )
-        env = obs_wrapper_class(env)
+        env = DefaultObsWrapper(env)
+        env = ImmortalGradReward(env)
         if not no_filter_observation:
             env = FilterObservation(env, filter_keys=["image", "vector"])
         env = BasicActionWrapper(env)
         env = PassiveEnvChecker(env)
         super().__init__(env)
-
-        self.reward_shaper = ImmortalRewardShaper()
-
-    def step(self, action) -> tuple[Any, SupportsFloat, bool, bool, dict[str, Any]]:
-        obs, original_reward, terminated, truncated, info = super().step(action)
-        shaped_reward = self.reward_shaper.compute_reward(obs, original_reward)
-        return obs, shaped_reward, terminated, truncated, info
 
 
 def save_image(obs: np.ndarray):
@@ -123,3 +117,4 @@ if __name__ == "__main__":
     env.close()
 
     save_image(obs)
+    ImmortalGradReward.save_distance_map(obs["id_map"], save_image=True)
