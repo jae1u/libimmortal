@@ -100,7 +100,7 @@ class ImmortalGradReward(gym.Wrapper):
         with open(ImmortalGradReward.DISTANCE_MAP_PATH, "wb") as f:
             pickle.dump(distance_map, f)
         if save_image:
-            plt.imshow(distance_map, cmap="hot", interpolation="nearest")
+            plt.imshow(distance_map, cmap="viridis", interpolation="nearest")
             plt.colorbar()
             plt.savefig("distance_map.png", bbox_inches="tight")
             plt.close()
