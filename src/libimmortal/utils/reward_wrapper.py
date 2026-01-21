@@ -5,10 +5,25 @@ from pathlib import Path
 import gymnasium as gym
 from collections import deque
 from libimmortal.utils.aux_func import DEFAULT_ENCODER
+from libimmortal.utils.enums import VectorObservationPlayerIndex
 import matplotlib.pyplot as plt
 
 
+class ImmortalBasicReward(gym.Wrapper):
+    REWARD_RANGE = (0.0, 32.0)
+
+    def __init__(self, env):
+        super().__init__(env)
+
+    def step(self, action):
+        observation, reward, terminated, truncated, info = self.env.step(action)
+        distance_offset = VectorObservationPlayerIndex.GOAL_PLAYER_DISTANCE
+        reward = -observation["vector"][distance_offset]
+        return observation, reward, terminated, truncated, info
+
+
 class ImmortalGradReward(gym.Wrapper):
+    REWARD_RANGE = (-500.0, 100.0)
     DISTANCE_MAP_PATH = Path("./distance_map.pkl")
     GRID_MAPPING_PATH = Path("./log.txt")
     GOAL_REWARD = 100.0
@@ -104,3 +119,25 @@ class ImmortalGradReward(gym.Wrapper):
             plt.colorbar()
             plt.savefig("distance_map.png", bbox_inches="tight")
             plt.close()
+
+
+class NormalizedRewardWrapper(gym.Wrapper):
+    """
+    return a normalized reward in [0, 1] based on the specified reward range.
+    """
+
+    def __init__(self, env: gym.Env, reward_range: tuple[float, float] | None = None):
+        super().__init__(env)
+
+        if reward_range is not None:
+            self.reward_range = reward_range
+        elif hasattr(env, "REWARD_RANGE"):
+            self.reward_range = getattr(env, "REWARD_RANGE")
+        else:
+            raise ValueError("Reward range must be specified.")
+
+    def step(self, action):
+        observation, reward, terminated, truncated, info = self.env.step(action)
+        min_reward, max_reward = self.reward_range
+        normalized_reward = (float(reward) - min_reward) / (max_reward - min_reward)
+        return observation, normalized_reward, terminated, truncated, info
