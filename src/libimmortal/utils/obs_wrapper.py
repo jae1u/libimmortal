@@ -114,7 +114,7 @@ class NormalizedVecWrapper(gym.ObservationWrapper):
                 "image": spaces.Box(
                     low=0, high=1, shape=(11, 90, 160), dtype=np.float32
                 ),
-                "vector": spaces.Box(low=-1, high=1, shape=(103,), dtype=np.float32),
+                "vector": spaces.Box(low=-1, high=1, shape=(99,), dtype=np.float32),
                 "id_map": spaces.Box(low=0, high=10, shape=(90, 160), dtype=np.int32),
                 "raw_graphic": spaces.Box(
                     low=0, high=255, shape=(3, 90, 160), dtype=np.uint8
@@ -125,7 +125,7 @@ class NormalizedVecWrapper(gym.ObservationWrapper):
     def observation(self, observation: dict[str, np.ndarray]):
         vector_obs = observation["vector"]
 
-        player_obs = vector_obs[:13]
+        player_obs = vector_obs[:9]
         player_obs[PlayerObs.POS_X] = self._normalize(
             player_obs[PlayerObs.POS_X], self.POS_X_MIN, self.POS_X_MAX
         )
@@ -150,18 +150,6 @@ class NormalizedVecWrapper(gym.ObservationWrapper):
         )
         player_obs[PlayerObs.IS_ATTACKABLE] = (
             player_obs[PlayerObs.IS_ATTACKABLE] * 2 - 1
-        )
-        player_obs[PlayerObs.GOAL_POS_X] = self._normalize(
-            player_obs[PlayerObs.GOAL_POS_X], self.POS_X_MIN, self.POS_X_MAX
-        )
-        player_obs[PlayerObs.GOAL_POS_Y] = self._normalize(
-            player_obs[PlayerObs.GOAL_POS_Y], self.POS_Y_MIN, self.POS_Y_MAX
-        )
-        player_obs[PlayerObs.GOAL_PLAYER_DIST] = self._normalize(
-            player_obs[PlayerObs.GOAL_PLAYER_DIST], 0.0, self.MAX_DISTANCE
-        )
-        player_obs[PlayerObs.TIME_ELAPSED] = self._normalize(
-            np.log1p(player_obs[PlayerObs.TIME_ELAPSED]), 0.0, 5.0
         )
 
         enemy_obs = []
@@ -218,6 +206,8 @@ class NormalizedVecWrapper(gym.ObservationWrapper):
 
 
 class ArrowObsWrapper(DefaultObsWrapper):
+    raise NotImplementedError("ArrowObsWrapper isn't ready for use yet.")
+
     def __init__(self, env: gym.Env, history_len: int = 2, max_arrows: int = 3):
         super().__init__(env)
         self.history_len = history_len
