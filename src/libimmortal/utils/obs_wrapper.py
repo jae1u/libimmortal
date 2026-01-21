@@ -85,6 +85,29 @@ class DefaultObsWrapper(gym.ObservationWrapper):
         }
 
 
+class NormalizedVecWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self.observation_space = spaces.Dict(
+            {
+                "image": spaces.Box(
+                    low=0, high=1, shape=(11, 90, 160), dtype=np.float32
+                ),
+                "vector": spaces.Box(
+                    low=-np.inf, high=np.inf, shape=(103,), dtype=np.float32
+                ),
+                "id_map": spaces.Box(low=0, high=10, shape=(90, 160), dtype=np.int32),
+                "raw_graphic": spaces.Box(
+                    low=0, high=255, shape=(3, 90, 160), dtype=np.uint8
+                ),
+            }
+        )
+
+    def observation(self, observation: dict[str, np.ndarray]):
+        vector_obs = observation["vector"]
+        return observation
+
+
 class ArrowObsWrapper(DefaultObsWrapper):
     def __init__(self, env: gym.Env, history_len: int = 2, max_arrows: int = 3):
         super().__init__(env)
