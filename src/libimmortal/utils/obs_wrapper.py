@@ -5,38 +5,40 @@ from gymnasium import spaces
 from libimmortal.utils import colormap_to_ids_and_onehot
 
 
+class PlayerObs:
+    POS_X = 0
+    POS_Y = 1
+    VEL_X = 2
+    VEL_Y = 3
+    CUL_DAMAGE = 4
+    IS_ACTIONABLE = 5
+    IS_HITTING = 6
+    IS_DOBBLE_JUMP_AVAILABLE = 7
+    IS_ATTACKABLE = 8
+    GOAL_POS_X = 9
+    GOAL_POS_Y = 10
+    GOAL_PLAYER_DIST = 11
+    TIME_ELAPSED = 12
+
+
+class EnemyObs:
+    TYPE_SKELETON = 0
+    TYPE_BOMBKID = 1
+    TYPE_TURRET = 2
+    POS_X = 3
+    POS_Y = 4
+    VEL_X = 5
+    VEL_Y = 6
+    HEALTH = 7
+    STATE = 8
+
+
 class DefaultObsWrapper(gym.ObservationWrapper):
     """
     Fix graphic observation shape
     Fix vector observation - missing enemy turret info
     Add onehot and id_map observations
     """
-
-    class PlayerObs:
-        POS_X = 0
-        POS_Y = 1
-        VEL_X = 2
-        VEL_Y = 3
-        CUL_DAMAGE = 4
-        IS_ACTIONABLE = 5
-        IS_HITTING = 6
-        IS_DOBBLE_JUMP_AVAILABLE = 7
-        IS_ATTACKABLE = 8
-        GOAL_POS_X = 9
-        GOAL_POS_Y = 10
-        GOAL_PLAYER_DIST = 11
-        TIME_ELAPSED = 12
-
-    class EnemyObs:
-        TYPE_SKELETON = 0
-        TYPE_BOMBKID = 1
-        TYPE_TURRET = 2
-        POS_X = 3
-        POS_Y = 4
-        VEL_X = 5
-        VEL_Y = 6
-        HEALTH = 7
-        STATE = 8
 
     def __init__(self, env):
         super().__init__(env)

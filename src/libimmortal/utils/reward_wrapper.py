@@ -5,7 +5,7 @@ from pathlib import Path
 import gymnasium as gym
 from collections import deque
 from libimmortal.utils.aux_func import DEFAULT_ENCODER
-from libimmortal.utils.obs_wrapper import DefaultObsWrapper
+from libimmortal.utils.obs_wrapper import PlayerObs
 import matplotlib.pyplot as plt
 
 """
@@ -23,7 +23,7 @@ class ImmortalBasicReward(gym.Wrapper):
 
     def step(self, action):
         observation, reward, terminated, truncated, info = self.env.step(action)
-        distance_offset = DefaultObsWrapper.PlayerObs.GOAL_PLAYER_DIST
+        distance_offset = PlayerObs.GOAL_PLAYER_DIST
         reward = -observation["vector"][distance_offset]
         return observation, reward, terminated, truncated, info
 
