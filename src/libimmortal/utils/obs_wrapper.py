@@ -206,8 +206,6 @@ class NormalizedVecWrapper(gym.ObservationWrapper):
 
 
 class ArrowObsWrapper(DefaultObsWrapper):
-    raise NotImplementedError("ArrowObsWrapper isn't ready for use yet.")
-
     def __init__(self, env: gym.Env, history_len: int = 2, max_arrows: int = 3):
         super().__init__(env)
         self.history_len = history_len
@@ -233,6 +231,7 @@ class ArrowObsWrapper(DefaultObsWrapper):
         )
 
     def reset(self, **kwargs):
+        raise NotImplementedError("ArrowObsWrapper isn't ready for use yet.")
         self.arrow_history.clear()
         return super().reset(**kwargs)
 
