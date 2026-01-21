@@ -31,9 +31,10 @@ class VectorObservationPlayerIndex:
 
 
 class VectorObservationEnemyIndex:
-    ENEMY_TYPE_SKELETON = 0
-    ENEMY_TYPE_BOMBKID = 1
-    ENEMY_TYPE_TURRET = 2
+    NONE = 0
+    ENEMY_TYPE_SKELETON = 1
+    ENEMY_TYPE_BOMBKID = 2
+    # ENEMY_TYPE_TURRET is missing in vector observation
     ENEMY_POSITION_X = 3
     ENEMY_POSITION_Y = 4
     ENEMY_VELOCITY_X = 5
