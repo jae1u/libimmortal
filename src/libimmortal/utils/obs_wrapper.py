@@ -6,6 +6,12 @@ from libimmortal.utils import colormap_to_ids_and_onehot
 
 
 class DefaultObsWrapper(gym.ObservationWrapper):
+    """
+    Fix graphic observation shape
+    Fix vector observation - missing enemy turret info
+    Add onehot and id_map observations
+    """
+
     class PlayerObs:
         POS_X = 0
         POS_Y = 1

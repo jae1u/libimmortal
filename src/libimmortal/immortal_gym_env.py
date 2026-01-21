@@ -1,6 +1,4 @@
-from typing import Dict, SupportsFloat, Any
 import numpy as np
-
 from mlagents_envs.environment import UnityEnvironment
 from mlagents_envs.envs.unity_gym_env import UnityToGymWrapper
 from mlagents_envs.side_channel.engine_configuration_channel import (
@@ -9,45 +7,14 @@ from mlagents_envs.side_channel.engine_configuration_channel import (
 from mlagents_envs.side_channel.environment_parameters_channel import (
     EnvironmentParametersChannel,
 )
+from libimmortal.utils.action_wrapper import BasicActionWrapper
 from libimmortal.utils.reward_wrapper import ImmortalGradReward, NormalizedRewardWrapper
 from libimmortal.utils.obs_wrapper import DefaultObsWrapper
-from libimmortal.utils.enums import ActionIndex
 import gymnasium as gym
 from gymnasium.wrappers import PassiveEnvChecker, FilterObservation
-from gymnasium import spaces
 import shimmy
 
 gym.register_envs(shimmy)
-
-
-class BasicActionWrapper(gym.ActionWrapper):
-    VERTICAL_MAP = {1: ActionIndex.MOVE_UP, 2: ActionIndex.MOVE_DOWN}
-    HORIZONTAL_MAP = {1: ActionIndex.MOVE_LEFT, 2: ActionIndex.MOVE_RIGHT}
-
-    def __init__(self, env):
-        super().__init__(env)
-        self.action_space = spaces.MultiDiscrete([3, 3])
-
-    def step(
-        self, action
-    ) -> tuple[Dict[str, np.ndarray], SupportsFloat, bool, bool, dict[str, Any]]:
-
-        obs, reward, terminated, truncated, info = self.env.step(self.action(action))
-
-        is_success = float(reward) > 0
-        terminated |= is_success
-        info["is_success"] = is_success
-
-        return obs, reward, terminated, truncated, info
-
-    def action(self, action: np.ndarray) -> np.ndarray:
-        _action = np.zeros(4, dtype=action.dtype)
-        vertical, horizontal = action
-        if vertical in self.VERTICAL_MAP:
-            _action[self.VERTICAL_MAP[vertical]] = 1
-        if horizontal in self.HORIZONTAL_MAP:
-            _action[self.HORIZONTAL_MAP[horizontal]] = 1
-        return np.pad(_action, (0, 4))
 
 
 class ImmortalGymEnv(gym.Wrapper):
@@ -90,12 +57,12 @@ class ImmortalGymEnv(gym.Wrapper):
             max_episode_steps=max_steps,
             disable_env_checker=True,
         )
+        env = BasicActionWrapper(env)
         env = DefaultObsWrapper(env)
         env = ImmortalGradReward(env)
         env = NormalizedRewardWrapper(env)
         if not no_filter_observation:
             env = FilterObservation(env, filter_keys=["image", "vector"])
-        env = BasicActionWrapper(env)
         env = PassiveEnvChecker(env)
         super().__init__(env)
 
@@ -117,5 +84,5 @@ if __name__ == "__main__":
     print(reward)
     env.close()
 
-    save_image(obs)
-    ImmortalGradReward.save_distance_map(obs["id_map"], save_image=True)
+    # save_image(obs)
+    # ImmortalGradReward.save_distance_map(obs["id_map"], save_image=True)

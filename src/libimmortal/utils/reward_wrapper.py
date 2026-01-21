@@ -8,6 +8,12 @@ from libimmortal.utils.aux_func import DEFAULT_ENCODER
 from libimmortal.utils.obs_wrapper import DefaultObsWrapper
 import matplotlib.pyplot as plt
 
+"""
+Note that Reward wrappers are applied after DefaultObsWrapper
+The observations provided to the reward wrappers are almost raw observations
+DefaultObsWrapper just fix some observation issues and add id_map observation
+"""
+
 
 class ImmortalBasicReward(gym.Wrapper):
     REWARD_RANGE = (0.0, 32.0)
