@@ -178,8 +178,8 @@ def main():
     env = VecNormalize(
         env,
         training=True,
-        norm_obs=True,
-        norm_reward=True,
+        norm_obs=False,
+        norm_reward=False,
         clip_obs=10.0,
         clip_reward=10.0,
         gamma=args.gamma,
