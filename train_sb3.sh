@@ -5,7 +5,6 @@ export CUDA_VISIBLE_DEVICES=$GPU_ID
 echo "Using GPU ID: $GPU_ID"
 
 python -m libimmortal.utils.train_sb3 \
-    --obs_type arrow \
     --total_timesteps 10000000 \
     --n_envs 2 \
     --n_steps 2048 \
