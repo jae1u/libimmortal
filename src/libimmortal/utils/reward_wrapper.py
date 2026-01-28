@@ -56,10 +56,16 @@ class ImmortalGradReward(gym.Wrapper):
     def step(self, action):
         observation, reward, terminated, truncated, info = self.env.step(action)
         reward, curr_distance = self.reward(observation, reward)
+        # If the agent has not made any progress for a prolonged period,
+        # treat it as a terminal failure so that vectorized runners
+        # (SB3's SubprocVecEnv/DummyVecEnv) force an immediate reset.
+        # Using `terminated` instead of only `truncated` avoids cases where
+        # downstream code ignores the truncation flag and keeps stepping.
         if self._update_stagnation(curr_distance):
-            truncated = True
+            terminated = True
             info = dict(info)
             info["stagnation_steps"] = self.steps_since_progress
+            info["stagnation_terminated"] = True
         return observation, reward, terminated, truncated, info
 
     def reset(self, **kwargs):
