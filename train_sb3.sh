@@ -7,10 +7,8 @@ echo "Using GPU ID: $GPU_ID"
 python -m libimmortal.utils.train_sb3 \
     --use_transformer \
     --transformer_vector_only \
-    --policy MultiInputPolicy \
-    --game_path /root/immortal_suffering/immortal_suffering_linux_build.x86_64 \
     --n_envs 8 \
-    --checkpoint_dir ./checkpoints \
+    --ent_coef 0.01 \
     --use_wandb \
     --wandb_project "immortal-suffering-sb3" \
     --resume_from  "/root/libimmortal/checkpoints/ppo_immortal_1120000_steps.zip" \
