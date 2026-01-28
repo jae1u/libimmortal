@@ -59,7 +59,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="SB3 PPO 학습")
 
     # fmt: off
-    parser.add_argument("--game_path", type=str, default="../immortal_suffering/immortal_suffering_linux_build.x86_64")
+    parser.add_argument("--game_path", type=str, default="/root/immortal_suffering/immortal_suffering_linux_build.x86_64")
     parser.add_argument("--port", type=int, default=5005)
     parser.add_argument("--time_scale", type=float, default=2.0)
     parser.add_argument(
