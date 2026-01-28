@@ -187,7 +187,7 @@ def main():
     checkpoint_dir = init_checkpoint_dir(args)
     wandb_init(args, checkpoint_dir)
 
-    env = SubprocVecEnv(get_env_fns(args, ports))
+    env = SubprocVecEnv(get_env_fns(args, ports), start_method="spawn")
     env = VecNormalize(
         env,
         training=True,
