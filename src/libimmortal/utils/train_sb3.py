@@ -5,7 +5,7 @@ import gymnasium as gym
 import torch
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
-from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
 import wandb
@@ -13,6 +13,7 @@ from wandb.integration.sb3 import WandbCallback
 
 from libimmortal.immortal_gym_env import ImmortalGymEnv
 from libimmortal.utils import find_n_free_tcp_ports
+from libimmortal.utils.transformer_extractor import TransformerDictExtractor
 
 
 class VecNormalizeCheckpointCallback(BaseCallback):
@@ -85,6 +86,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoint_dir", type=str, default="./checkpoints")
     parser.add_argument("--save_freq", type=int, default=10000)
     parser.add_argument("--policy", type=str, default="MultiInputPolicy", help="MultiInputPolicy for Dict observations")
+    parser.add_argument("--use_transformer", action="store_true", help="Use transformer-based feature extractor")
+    parser.add_argument("--transformer_d_model", type=int, default=128)
+    parser.add_argument("--transformer_n_heads", type=int, default=4)
+    parser.add_argument("--transformer_n_layers", type=int, default=2)
+    parser.add_argument("--transformer_ffn_dim", type=int, default=256)
+    parser.add_argument("--transformer_dropout", type=float, default=0.1)
+    parser.add_argument("--image_features_dim", type=int, default=256)
+    parser.add_argument("--vector_features_dim", type=int, default=128)
+    parser.add_argument(
+        "--transformer_vector_only",
+        action="store_true",
+        help="Use transformer over vector only (ignore image) for faster experiments",
+    )
     parser.add_argument(
         "--use_wandb",
         action="store_true",
@@ -257,10 +271,26 @@ def main():
         )
     else:
         print(f"새로운 모델 생성")
+        policy_kwargs = None
+        if args.use_transformer:
+            policy_kwargs = {
+                "features_extractor_class": TransformerDictExtractor,
+                "features_extractor_kwargs": {
+                    "image_features_dim": args.image_features_dim,
+                    "vector_features_dim": args.vector_features_dim,
+                    "d_model": args.transformer_d_model,
+                    "n_heads": args.transformer_n_heads,
+                    "n_layers": args.transformer_n_layers,
+                    "ffn_dim": args.transformer_ffn_dim,
+                    "dropout": args.transformer_dropout,
+                    "use_image": not args.transformer_vector_only,
+                },
+            }
         model = PPO(
             args.policy,
             env,
             seed=seed,
+            policy_kwargs=policy_kwargs,
             learning_rate=args.learning_rate,
             n_steps=args.n_steps,
             batch_size=args.batch_size,
