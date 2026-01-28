@@ -60,7 +60,7 @@ class ImmortalGymEnv(gym.Wrapper):
         env = DefaultObsWrapper(env)  # Fix and add onehot/id_map
 
         env = ImmortalGradReward(env)  # Edit reward using almost raw observation
-        env = NormalizedRewardWrapper(env)  # Normalize reward to 0~1
+        # env = NormalizedRewardWrapper(env)  # Normalize reward to 0~1
 
         env = NormalizedVecWrapper(env)  # Normalize vector observation to -1~1
 
