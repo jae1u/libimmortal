@@ -62,12 +62,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--game_path", type=str, default="/root/immortal_suffering/immortal_suffering_linux_build.x86_64")
     parser.add_argument("--port", type=int, default=5005)
     parser.add_argument("--time_scale", type=float, default=2.0)
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=None,
-        help="Base seed; if omitted, a random seed is used",
-    )
+    parser.add_argument("--seed", type=int, default=None, help="Base seed; if omitted, a random seed is used")
     parser.add_argument("--max_steps", type=int, default=2000, help="에피소드 최대 스텝 (truncate)")
     parser.add_argument("--no-filter-observation", action="store_true")
 
@@ -94,22 +89,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--transformer_dropout", type=float, default=0.1)
     parser.add_argument("--image_features_dim", type=int, default=256)
     parser.add_argument("--vector_features_dim", type=int, default=128)
-    parser.add_argument(
-        "--transformer_vector_only",
-        action="store_true",
-        help="Use transformer over vector only (ignore image) for faster experiments",
-    )
-    parser.add_argument(
-        "--use_wandb",
-        action="store_true",
-        default=True,
-        help="Use WandB logging (default: enabled)",
-    )
-    parser.add_argument(
-        "--no_wandb",
-        action="store_true",
-        help="Disable WandB logging",
-    )
+    parser.add_argument("--transformer_vector_only", action="store_true", help="Use transformer over vector only (ignore image) for faster experiments")
+    parser.add_argument("--use_wandb", action="store_true", default=True, help="Use WandB logging (default: enabled)")
+    parser.add_argument("--no_wandb", action="store_true", help="Disable WandB logging")
     parser.add_argument("--wandb_project", type=str, default="immortal-suffering-sb3")
     parser.add_argument("--wandb_run_name", type=str, default=None)
     parser.add_argument("--resume_from", type=str, default=None, help="Path to checkpoint to resume from")
