@@ -34,6 +34,8 @@ class ImmortalGradReward(gym.Wrapper):
     GRID_MAPPING_PATH = Path("./log.txt")
     GOAL_REWARD = 100.0
     BAD_REWARD = -500.0
+    TIME_PENALTY = 0.01
+    STAGNATION_LIMIT = 120
 
     def __init__(self, env):
         super().__init__(env)
@@ -47,16 +49,48 @@ class ImmortalGradReward(gym.Wrapper):
         slope_x, intercept_x = np.polyfit(data[:, 0], data[:, 2], 1)
         slope_y, intercept_y = np.polyfit(data[:, 1], data[:, 3], 1)
         self.grid_pos_data = (slope_x, intercept_x, slope_y, intercept_y)
+        self.prev_distance: float | None = None
+        self.best_distance: float | None = None
+        self.steps_since_progress = 0
 
     def step(self, action):
         observation, reward, terminated, truncated, info = self.env.step(action)
-        reward = self.reward(observation, reward)
+        reward, curr_distance = self.reward(observation, reward)
+        if self._update_stagnation(curr_distance):
+            truncated = True
+            info = dict(info)
+            info["stagnation_steps"] = self.steps_since_progress
         return observation, reward, terminated, truncated, info
 
-    def reward(self, observation: Dict[str, np.ndarray], original_reward):
-        if float(original_reward) > 0:
-            return self.GOAL_REWARD
+    def reset(self, **kwargs):
+        observation, info = self.env.reset(**kwargs)
+        self.prev_distance = self._get_player_distance(observation)
+        self.best_distance = self.prev_distance
+        self.steps_since_progress = 0
+        return observation, info
 
+    def reward(self, observation: Dict[str, np.ndarray], original_reward) -> tuple[float, float | None]:
+        if float(original_reward) > 0:
+            self.prev_distance = None
+            self.best_distance = None
+            self.steps_since_progress = 0
+            return self.GOAL_REWARD, None
+
+        curr_distance = self._get_player_distance(observation)
+        if curr_distance is None:
+            self.prev_distance = None
+            return self.BAD_REWARD, None
+
+        if self.prev_distance is None:
+            shaped_reward = 0.0
+        else:
+            shaped_reward = float(self.prev_distance - curr_distance)
+
+        shaped_reward -= self.TIME_PENALTY
+        self.prev_distance = curr_distance
+        return shaped_reward, curr_distance
+
+    def _get_player_distance(self, observation: Dict[str, np.ndarray]) -> float | None:
         vector_obs = observation["vector"]
         player_x = vector_obs[0]
         player_y = -vector_obs[1]  # mapping had inverted y-axis
@@ -64,14 +98,27 @@ class ImmortalGradReward(gym.Wrapper):
 
         max_y, max_x = self.distance_map.shape  # note: (y,x) order
         if not (0 <= grid_x < max_x and 0 <= grid_y < max_y):
-            return self.BAD_REWARD
+            return None
 
         player_distance = self.distance_map[grid_y, grid_x]  # note: (y,x) order
 
         if player_distance == -1:
-            return self.BAD_REWARD
+            return None
 
-        return -player_distance
+        return float(player_distance)
+
+    def _update_stagnation(self, curr_distance: float | None) -> bool:
+        if curr_distance is None:
+            self.steps_since_progress = 0
+            return False
+
+        if self.best_distance is None or curr_distance < self.best_distance:
+            self.best_distance = curr_distance
+            self.steps_since_progress = 0
+            return False
+
+        self.steps_since_progress += 1
+        return self.steps_since_progress >= self.STAGNATION_LIMIT
 
     def get_grid_pos(self, player_x, player_y) -> tuple[int, int]:
         slope_x, intercept_x, slope_y, intercept_y = self.grid_pos_data
