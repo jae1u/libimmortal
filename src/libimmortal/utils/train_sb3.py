@@ -16,36 +16,6 @@ from libimmortal.utils import find_n_free_tcp_ports
 from libimmortal.utils.transformer_extractor import TransformerDictExtractor
 
 
-class VecNormalizeCheckpointCallback(BaseCallback):
-    def __init__(self, save_freq, save_path, name_prefix="rl_model", verbose=0):
-        super().__init__(verbose)
-        self.save_freq = save_freq
-        self.save_path = Path(save_path)
-        self.name_prefix = name_prefix
-        self.save_path.mkdir(parents=True, exist_ok=True)
-
-    def _on_step(self):
-        if self.n_calls % self.save_freq == 0:
-            # 모델 저장
-            model_path = (
-                self.save_path / f"{self.name_prefix}_{self.num_timesteps}_steps"
-            )
-            self.model.save(model_path)
-            if self.verbose > 0:
-                print(f"Saving model checkpoint to {model_path}")
-
-            # VecNormalize stats 저장
-            if hasattr(self.training_env, "save"):
-                stats_path = (
-                    self.save_path / f"vec_normalize_{self.num_timesteps}_steps.pkl"
-                )
-                getattr(self.training_env, "save")(stats_path)
-                if self.verbose > 0:
-                    print(f"Saving VecNormalize stats to {stats_path}")
-
-        return True
-
-
 def make_env(**kwargs):
     def _init() -> gym.Env:
         env = ImmortalGymEnv(**kwargs)
@@ -171,19 +141,13 @@ def get_env_fns(args: argparse.Namespace, ports):
 
 
 def get_callbacks(args: argparse.Namespace, checkpoint_dir: Path) -> list[BaseCallback]:
-    callbacks: list[BaseCallback] = [
-        VecNormalizeCheckpointCallback(
-            save_freq=args.save_freq,
-            save_path=str(checkpoint_dir),
-            name_prefix="ppo_immortal",
-            verbose=1,
-        )
-    ]
+    callbacks: list[BaseCallback] = []
     callbacks.append(
         CheckpointCallback(
             save_freq=args.save_freq,
             save_path=str(checkpoint_dir),
             name_prefix="ppo_immortal",
+            save_vecnormalize=True,
         )
     )
     if args.use_wandb:
