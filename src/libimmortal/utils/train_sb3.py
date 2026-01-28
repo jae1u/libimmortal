@@ -85,11 +85,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoint_dir", type=str, default="./checkpoints")
     parser.add_argument("--save_freq", type=int, default=10000)
     parser.add_argument("--policy", type=str, default="MultiInputPolicy", help="MultiInputPolicy for Dict observations")
-    parser.add_argument("--use_wandb", action="store_true", help="Use WandB logging")
+    parser.add_argument(
+        "--use_wandb",
+        action="store_true",
+        default=True,
+        help="Use WandB logging (default: enabled)",
+    )
+    parser.add_argument(
+        "--no_wandb",
+        action="store_true",
+        help="Disable WandB logging",
+    )
     parser.add_argument("--wandb_project", type=str, default="immortal-suffering-sb3")
     parser.add_argument("--wandb_run_name", type=str, default=None)
     parser.add_argument("--resume_from", type=str, default=None, help="Path to checkpoint to resume from")
     # fmt: on
+
+    args = parser.parse_args()
+    if args.no_wandb:
+        args.use_wandb = False
+    return args
+
 
 def resolve_seed(args: argparse.Namespace) -> int:
     if args.seed is None:
@@ -132,6 +148,7 @@ def wandb_init(args: argparse.Namespace, checkpoint_dir: Path):
         config=vars(args),
         monitor_gym=True,
         save_code=True,
+        sync_tensorboard=True,
     )
     assert wandb.run is not None
 
@@ -166,6 +183,13 @@ def get_callbacks(args: argparse.Namespace, checkpoint_dir: Path) -> list[BaseCa
             verbose=1,
         )
     ]
+    callbacks.append(
+        CheckpointCallback(
+            save_freq=args.save_freq,
+            save_path=str(checkpoint_dir),
+            name_prefix="ppo_immortal",
+        )
+    )
     if args.use_wandb:
         callbacks.append(
             WandbCallback(
@@ -249,6 +273,7 @@ def main():
             max_grad_norm=args.max_grad_norm,
             verbose=2,
             device=device,
+            tensorboard_log=str(checkpoint_dir / "tb"),
         )
 
     print(f"Starting training...")
