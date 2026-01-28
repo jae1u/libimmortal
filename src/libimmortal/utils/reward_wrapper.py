@@ -35,7 +35,7 @@ class ImmortalGradReward(gym.Wrapper):
     GOAL_REWARD = 100.0
     BAD_REWARD = -500.0
     TIME_PENALTY = 0.01
-    STAGNATION_LIMIT = 120
+    STAGNATION_LIMIT = 300
 
     def __init__(self, env):
         super().__init__(env)
