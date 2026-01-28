@@ -1,4 +1,5 @@
 import argparse
+import random
 from pathlib import Path
 import gymnasium as gym
 import torch
@@ -6,6 +7,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.utils import set_random_seed
 import wandb
 from wandb.integration.sb3 import WandbCallback
 
@@ -59,7 +61,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--game_path", type=str, default="../immortal_suffering/immortal_suffering_linux_build.x86_64")
     parser.add_argument("--port", type=int, default=5005)
     parser.add_argument("--time_scale", type=float, default=2.0)
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Base seed; if omitted, a random seed is used",
+    )
     parser.add_argument("--max_steps", type=int, default=2000, help="에피소드 최대 스텝 (truncate)")
     parser.add_argument("--no-filter-observation", action="store_true")
 
@@ -84,7 +91,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--resume_from", type=str, default=None, help="Path to checkpoint to resume from")
     # fmt: on
 
-    return parser.parse_args()
+def resolve_seed(args: argparse.Namespace) -> int:
+    if args.seed is None:
+        args.seed = random.SystemRandom().randint(0, 2**31 - 1)
+    return args.seed
 
 
 def init_ports(args: argparse.Namespace) -> list[int]:
@@ -169,6 +179,9 @@ def get_callbacks(args: argparse.Namespace, checkpoint_dir: Path) -> list[BaseCa
 
 def main():
     args = parse_args()
+    seed = resolve_seed(args)
+    set_random_seed(seed)
+    print(f"Seed: {seed}")
 
     ports = init_ports(args)
     checkpoint_dir = init_checkpoint_dir(args)
@@ -223,6 +236,7 @@ def main():
         model = PPO(
             args.policy,
             env,
+            seed=seed,
             learning_rate=args.learning_rate,
             n_steps=args.n_steps,
             batch_size=args.batch_size,
