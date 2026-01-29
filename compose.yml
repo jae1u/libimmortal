@@ -6,8 +6,6 @@ services:
       context: .
       args:
         GAME_VER: "v1.0.1"
-    ports:
-      - "127.0.0.1:15900:5900"
     environment:
       - DISPLAY=:99
       # - XVFB_RES=1600x900x24     # 필요시 해상도 지정 (start_xvfb.sh에서 읽음)
