@@ -8,7 +8,10 @@ python -m libimmortal.utils.train_sb3 \
     --use_transformer \
     --transformer_vector_only \
     --n_envs 8 \
+    --learning_rate 0.0003 \
+    --batch_size 1024 \
     --ent_coef 0.01 \
+    --transformer_d_model 128 \
+    --transformer_n_heads 4 \
     --use_wandb \
     --wandb_project "immortal-suffering-sb3" \
-    --resume_from  "/root/libimmortal/checkpoints/ppo_immortal_1120000_steps.zip" \
