@@ -29,21 +29,41 @@ class ImmortalGymEnv(gym.Wrapper):
         max_steps: int = 2000,
         no_filter_observation: bool = False,
     ):
+        self.game_path = game_path
+        self.port = port
+        self.time_scale = time_scale
+        self.seed = seed
+        self.max_steps = max_steps
+        self.no_filter_observation = no_filter_observation
+        self.env: gym.Env | None = None
+
+    def reset(self, *, seed: int | None = None, options: dict | None = None):
+        if self.env is not None:
+            self.env.close()
+
+        self.seed = seed if seed is not None else self.seed
+        env = self._make_env()
+        super().__init__(env)
+
+        assert self.env is not None
+        return self.env.reset(seed=seed, options=options)
+
+    def _make_env(self) -> gym.Env:
         _engine_channel = EngineConfigurationChannel()
         _env_param_channel = EnvironmentParametersChannel()
         env = UnityEnvironment(
-            file_name=game_path,
-            base_port=port,
+            file_name=self.game_path,
+            base_port=self.port,
             no_graphics=False,
             side_channels=[_engine_channel, _env_param_channel],
         )
         _engine_channel.set_configuration_parameters(
-            time_scale=time_scale,
+            time_scale=self.time_scale,
             target_frame_rate=-1,
             capture_frame_rate=0,
             quality_level=0,
         )
-        _env_param_channel.set_float_parameter("seed", float(seed))
+        _env_param_channel.set_float_parameter("seed", float(self.seed))
 
         env = UnityToGymWrapper(
             env,
@@ -53,7 +73,7 @@ class ImmortalGymEnv(gym.Wrapper):
         env = gym.make(
             "GymV21Environment-v0",
             env=env,
-            max_episode_steps=max_steps,
+            max_episode_steps=self.max_steps,
             disable_env_checker=True,
         )
         env = BasicActionWrapper(env)
@@ -64,11 +84,12 @@ class ImmortalGymEnv(gym.Wrapper):
 
         env = NormalizedVecWrapper(env)  # Normalize vector observation to -1~1
 
-        if not no_filter_observation:
+        if not self.no_filter_observation:
             env = FilterObservation(env, filter_keys=["image", "vector"])
 
         env = PassiveEnvChecker(env)
-        super().__init__(env)
+
+        return env
 
 
 def save_image(obs: np.ndarray):
