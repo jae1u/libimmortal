@@ -3,6 +3,7 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 from libimmortal.utils import colormap_to_ids_and_onehot
+from libimmortal.utils.enums import GraphicObservationColorMap
 
 
 class PlayerObs:
@@ -60,6 +61,7 @@ class DefaultObsWrapper(gym.ObservationWrapper):
     def observation(self, observation: list[np.ndarray]):
         graphic_obs, vector_obs = observation
         graphic_obs = graphic_obs.flatten().reshape(90, 160, 3)  # Fix shape (HWC)
+        graphic_obs = self.fix_flatform(graphic_obs)
 
         id_map, onehot = colormap_to_ids_and_onehot(graphic_obs)
         onehot = onehot.astype(np.float32)
@@ -85,6 +87,36 @@ class DefaultObsWrapper(gym.ObservationWrapper):
             "id_map": id_map,
             "raw_graphic": graphic_obs,
         }
+
+    def fix_flatform(self, graphic_obs: np.ndarray) -> np.ndarray:
+        wall_color = np.array(GraphicObservationColorMap.WALL, dtype=np.uint8)
+        platform_color = np.array(GraphicObservationColorMap.PLATFORM, dtype=np.uint8)
+
+        # 1. 16,82 ~ 150,82 벽 보강
+        graphic_obs[82:83, 16:151, :] = wall_color
+
+        # 2. 46,37 ~ 53,37 벽 보강
+        graphic_obs[37:38, 46:54, :] = wall_color
+
+        # 3. 84,44 ~ 113,44 벽 보강
+        graphic_obs[44:45, 84:114, :] = wall_color
+
+        # 4. 54,37 ~ 75,37 플랫폼 보강
+        graphic_obs[37:38, 54:76, :] = platform_color
+
+        # 5. 54,52 ~ 64,52 플랫폼 보강
+        graphic_obs[52:53, 54:65, :] = platform_color
+
+        # 6. 68,67 ~ 110,67 플랫폼 보강
+        graphic_obs[67:68, 68:111, :] = platform_color
+
+        # 7. 95,23 ~ 105,23 플랫폼 보강
+        graphic_obs[23:24, 95:106, :] = platform_color
+
+        # 8. 129,53 ~ 143,53 플랫폼 보강
+        graphic_obs[53:54, 129:144, :] = platform_color
+
+        return graphic_obs
 
 
 class NormalizedVecWrapper(gym.ObservationWrapper):
