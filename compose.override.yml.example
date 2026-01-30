@@ -2,3 +2,7 @@ services:
   libimmortal:
     ports:
       - "127.0.0.1:15900:5900"
+    # environment:
+    #   - DISPLAY=:0
+    # volumes:
+    #   - /tmp/.X11-unix:/tmp/.X11-unix:ro
