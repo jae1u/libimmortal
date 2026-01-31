@@ -204,7 +204,7 @@ def main():
         if "steps" in checkpoint_path.stem:
             timesteps_str = checkpoint_path.stem.split("_")[-2]
             vec_normalize_path = (
-                checkpoint_path.parent / f"vec_normalize_{timesteps_str}_steps.pkl"
+                checkpoint_path.parent / f"ppo_immortal_vecnormalize_{timesteps_str}_steps.pkl"
             )
             assert vec_normalize_path.exists()
             print(f"VecNormalize 통계 복원: {vec_normalize_path}")
