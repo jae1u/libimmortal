@@ -8,10 +8,16 @@ python -m libimmortal.utils.train_sb3 \
     --use_transformer \
     --transformer_vector_only \
     --n_envs 8 \
-    --learning_rate 0.0003 \
-    --batch_size 1024 \
     --ent_coef 0.01 \
-    --transformer_d_model 128 \
-    --transformer_n_heads 4 \
     --use_wandb \
     --wandb_project "immortal-suffering-sb3" \
+    --checkpoint_dir "./checkpoints_from_20260131" \
+    --use_transformer \
+    --image_features_dim 96 \
+    --vector_features_dim 128 \
+    --transformer_d_model 128 \
+    --transformer_n_heads 4 \
+    --transformer_n_layers 4 \
+    --transformer_ffn_dim 256 \
+    --transformer_dropout 0.1 \
+    --resume_from "/root/libimmortal/checkpoints_from_20260131/ppo_immortal_5040000_steps.zip"
