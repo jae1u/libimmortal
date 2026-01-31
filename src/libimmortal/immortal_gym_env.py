@@ -35,7 +35,9 @@ class ImmortalGymEnv(gym.Wrapper):
         self.seed = seed
         self.max_steps = max_steps
         self.no_filter_observation = no_filter_observation
-        self.env: gym.Env | None = None
+        env = self._make_env()
+        self.env: gym.Env | None = env
+        super().__init__(env)
 
     def reset(self, *, seed: int | None = None, options: dict | None = None):
         if self.env is not None:
@@ -43,7 +45,10 @@ class ImmortalGymEnv(gym.Wrapper):
 
         self.seed = seed if seed is not None else self.seed
         env = self._make_env()
-        super().__init__(env)
+        
+        self.env = env
+        self.observation_space = env.observation_space
+        self.action_space = env.action_space
 
         assert self.env is not None
         return self.env.reset(seed=seed, options=options)

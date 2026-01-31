@@ -56,11 +56,11 @@ class ImmortalGradReward(gym.Wrapper):
         # (SB3's SubprocVecEnv/DummyVecEnv) force an immediate reset.
         # Using `terminated` instead of only `truncated` avoids cases where
         # downstream code ignores the truncation flag and keeps stepping.
-        if self._update_stagnation(curr_distance):
-            terminated = True
-            info = dict(info)
-            info["stagnation_steps"] = self.steps_since_progress
-            info["stagnation_terminated"] = True
+        # if self._update_stagnation(curr_distance):
+        #     terminated = True
+        #     info = dict(info)
+        #     info["stagnation_steps"] = self.steps_since_progress
+        #     info["stagnation_terminated"] = True
         return observation, reward, terminated, truncated, info
 
     def reset(self, **kwargs):
