@@ -132,7 +132,7 @@ def main():
     parser.add_argument("--no_wandb", action="store_true", help="Disable WandB logging")
     parser.add_argument("--wandb_project", type=str, default="immortal-suffering-sb3")
     parser.add_argument("--wandb_run_name", type=str, default=None)
-    parser.add_argument("--resume_from", type=str, default="/root/libimmortal/checkpoints_from_20260131/ppo_immortal_3680000_steps.zip", help="Path to checkpoint to resume from")
+    parser.add_argument("--resume_from", type=str, default="/root/libimmortal/checkpoints_from_20260131/ppo_immortal_5040000_steps.zip", help="Path to checkpoint to resume from")
     
     ###################################
     """
@@ -182,7 +182,8 @@ def main():
     # vec_normalize_path = (
     #     checkpoint_path.parent / f"ppo_immortal_vecnormalize_{timesteps_str}_steps.pkl"
     # )
-    vec_normalize_path = "/root/libimmortal/checkpoints_from_20260131/ppo_immortal_vecnormalize_3760000_steps.pkl"
+    # vec_normalize_path = "/root/libimmortal/checkpoints_from_20260131/ppo_immortal_vecnormalize_3760000_steps.pkl"
+    vec_normalize_path = "/root/libimmortal/checkpoints_from_20260131/ppo_immortal_vecnormalize_5040000_steps.pkl"
     env = VecNormalize.load(str(vec_normalize_path), env)
 
     MAX_STEPS = args.max_steps
