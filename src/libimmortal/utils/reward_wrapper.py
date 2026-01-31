@@ -31,11 +31,11 @@ class ImmortalBasicReward(gym.Wrapper):
 class ImmortalGradReward(gym.Wrapper):
     REWARD_RANGE = (-500.0, 100.0)
     DISTANCE_MAP_PATH = Path("./distance_map.pkl")
-    GRID_MAPPING_PATH = Path("./log.txt")
     GOAL_REWARD = 100.0
     BAD_REWARD = -500.0
     TIME_PENALTY = 0.01
     STAGNATION_LIMIT = 300
+    PLAYER_ID = DEFAULT_ENCODER.name2id["KNIGHT"]
 
     def __init__(self, env):
         super().__init__(env)
@@ -44,11 +44,6 @@ class ImmortalGradReward(gym.Wrapper):
         with open(self.DISTANCE_MAP_PATH, "rb") as f:
             self.distance_map: np.ndarray = pickle.load(f)
 
-        assert self.GRID_MAPPING_PATH.exists()
-        data = np.loadtxt(self.GRID_MAPPING_PATH, delimiter=",")
-        slope_x, intercept_x = np.polyfit(data[:, 0], data[:, 2], 1)
-        slope_y, intercept_y = np.polyfit(data[:, 1], data[:, 3], 1)
-        self.grid_pos_data = (slope_x, intercept_x, slope_y, intercept_y)
         self.prev_distance: float | None = None
         self.best_distance: float | None = None
         self.steps_since_progress = 0
@@ -75,7 +70,9 @@ class ImmortalGradReward(gym.Wrapper):
         self.steps_since_progress = 0
         return observation, info
 
-    def reward(self, observation: Dict[str, np.ndarray], original_reward) -> tuple[float, float | None]:
+    def reward(
+        self, observation: Dict[str, np.ndarray], original_reward
+    ) -> tuple[float, float | None]:
         if float(original_reward) > 0:
             self.prev_distance = None
             self.best_distance = None
@@ -97,16 +94,18 @@ class ImmortalGradReward(gym.Wrapper):
         return shaped_reward, curr_distance
 
     def _get_player_distance(self, observation: Dict[str, np.ndarray]) -> float | None:
-        vector_obs = observation["vector"]
-        player_x = vector_obs[0]
-        player_y = -vector_obs[1]  # mapping had inverted y-axis
-        grid_x, grid_y = self.get_grid_pos(player_x, player_y)
+        id_map = observation["id_map"]
+        player_pixels = np.argwhere(id_map == self.PLAYER_ID)
 
-        max_y, max_x = self.distance_map.shape  # note: (y,x) order
+        mean_y, mean_x = np.mean(player_pixels, axis=0)
+        grid_y = int(round(mean_y))
+        grid_x = int(round(mean_x))
+
+        max_y, max_x = self.distance_map.shape
         if not (0 <= grid_x < max_x and 0 <= grid_y < max_y):
             return None
 
-        player_distance = self.distance_map[grid_y, grid_x]  # note: (y,x) order
+        player_distance = self.distance_map[grid_y, grid_x]
 
         if player_distance == -1:
             return None
@@ -125,12 +124,6 @@ class ImmortalGradReward(gym.Wrapper):
 
         self.steps_since_progress += 1
         return self.steps_since_progress >= self.STAGNATION_LIMIT
-
-    def get_grid_pos(self, player_x, player_y) -> tuple[int, int]:
-        slope_x, intercept_x, slope_y, intercept_y = self.grid_pos_data
-        gx = int(slope_x * player_x + intercept_x)
-        gy = int(slope_y * player_y + intercept_y)
-        return gx, gy
 
     @staticmethod
     def calculate_distance_map(id_map: np.ndarray) -> np.ndarray:
