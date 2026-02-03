@@ -41,6 +41,7 @@ class TransformerDictExtractor(BaseFeaturesExtractor):
         enemy_dim: int | None = None,
         num_enemies: int | None = None,
         use_image: bool = True,
+        image_normalized: bool = True,
     ) -> None:
         self.image_space = observation_space["image"]
         self.vector_space = observation_space["vector"]
@@ -80,10 +81,13 @@ class TransformerDictExtractor(BaseFeaturesExtractor):
         self.num_enemies = num_enemies
         self.d_model = d_model
         self.use_image = use_image
+        self.image_normalized = image_normalized
 
         if self.use_image:
             self.image_extractor = NatureCNN(
-                self.image_space, features_dim=image_features_dim
+                self.image_space,
+                features_dim=image_features_dim,
+                normalized_image=self.image_normalized,
             )
         else:
             self.image_extractor = None

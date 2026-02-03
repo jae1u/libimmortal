@@ -38,18 +38,19 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--n_envs", type=int, default=4)
     parser.add_argument("--total_timesteps", type=int, default=10000000)
-    parser.add_argument("--learning_rate", type=float, default=3e-4)
+    parser.add_argument("--learning_rate", type=float, default=1e-3)
     parser.add_argument("--n_steps", type=int, default=512)
     parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--n_epochs", type=int, default=10, help="각 업데이트당 반복 횟수")
     parser.add_argument("--gamma", type=float, default=0.99)
-    parser.add_argument("--gae_lambda", type=float, default=0.95)
+    parser.add_argument("--gae_lambda", type=float, default=0.99)
+    parser.add_argument("--clip_reward", type=float, default=1000.0,)
     parser.add_argument("--clip_range", type=float, default=0.1)
-    parser.add_argument("--ent_coef", type=float, default=0.02)
+    parser.add_argument("--ent_coef", type=float, default=0.001)
     parser.add_argument("--vf_coef", type=float, default=0.5)
     parser.add_argument("--max_grad_norm", type=float, default=0.5)
     parser.add_argument("--checkpoint_dir", type=str, default="./checkpoints")
-    parser.add_argument("--save_freq", type=int, default=10000)
+    parser.add_argument("--save_freq", type=int, default=50000)
     parser.add_argument("--policy", type=str, default="MultiInputPolicy", help="MultiInputPolicy for Dict observations")
     parser.add_argument("--use_transformer", action="store_true", help="Use transformer-based feature extractor")
     parser.add_argument("--transformer_d_model", type=int, default=128)
@@ -178,7 +179,7 @@ def main():
         norm_obs=False,
         norm_reward=True,
         clip_obs=10.0,
-        clip_reward=10.0,
+        clip_reward=args.clip_reward,
         gamma=args.gamma,
         epsilon=1e-8,
     )
