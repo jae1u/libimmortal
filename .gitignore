@@ -4,8 +4,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 .env
-checkpoints/
-checkpoints_from_20260130/
-checkpoints_from_20260131/
+checkpoints*/
 wandb/
 compose.override.yml
